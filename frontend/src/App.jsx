@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 const API = axios.create({
-    baseURL: 'https://securepay-api.loca.lt',
+    baseURL: 'https://secure-payai.onrender.com',
     headers: { 'Bypass-Tunnel-Reminder': 'true' }
 });
 
@@ -991,7 +991,7 @@ const App = () => {
                     <div className="mt-auto px-6 py-8 border-t border-[var(--border)]">
                         <div className="mb-4">
                             <div className="text-[10px] uppercase opacity-40 font-bold mb-2 tracking-widest">Architect</div>
-                            <div className="text-sm font-bold bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text text-transparent">Pramodh Raja</div>
+                            <div className="text-sm font-bold bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text text-transparent">Pramodh Raja(XI-B)</div>
                         </div>
                         <button className="flex items-center gap-2 text-xs opacity-40 hover:opacity-100 transition-all text-red-500" onClick={handleLogout}>
                             <X size={14} /> System Logout
