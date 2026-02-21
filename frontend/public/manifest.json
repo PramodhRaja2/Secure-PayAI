@@ -1,0 +1,16 @@
+{
+    "short_name": "SecurePay",
+    "name": "SecurePay AI Fusion",
+    "icons": [
+        {
+            "src": "securepay_app_icon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "start_url": "./index.html",
+    "display": "standalone",
+    "theme_color": "#4f7df9",
+    "background_color": "#ffffff"
+}
