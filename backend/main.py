@@ -10,8 +10,31 @@ import uuid
 from database import init_db, SessionLocal, Transaction, UserProfile, Alert
 from sqlalchemy import func
 import json
+from fastapi import WebSocket, WebSocketDisconnect
 
 sessions = {} # token -> username
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[int, WebSocket] = {} # user_id -> websocket
+
+    async def connect(self, user_id: int, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
+
+    def disconnect(self, user_id: int):
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+
+    async def send_personal_message(self, message: dict, user_id: int):
+        if user_id in self.active_connections:
+            await self.active_connections[user_id].send_json(message)
+
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections.values():
+            await connection.send_json(message)
+
+manager = ConnectionManager()
 
 app = FastAPI(
     title="SecurePay Optimizer AI V4.0",
@@ -193,6 +216,19 @@ async def send_user_message(payload: dict):
     )
     db.add(new_msg)
     db.commit()
+    
+    # Real-time broadcast to admin
+    msg_data = {
+        "id": new_msg.id,
+        "user_id": new_msg.user_id,
+        "from_user_id": new_msg.from_user_id,
+        "from_username": new_msg.from_username,
+        "type": new_msg.type,
+        "message": new_msg.message,
+        "time": new_msg.time
+    }
+    await manager.send_personal_message(msg_data, admin.id)
+    
     db.close()
     return {"status": "sent"}
 
@@ -317,6 +353,20 @@ async def send_dev_message(payload: dict, authorization: str = Header(None)):
     else:
         db.add(Alert(user_id=target_id, from_username=sender_name, type="info", message=msg_text))
     db.commit()
+
+    # Real-time broadcast
+    msg_data = {
+        "from_username": sender_name,
+        "type": "info",
+        "message": msg_text,
+        "time": datetime.now().isoformat()
+    }
+
+    if target_id == 0:
+        await manager.broadcast(msg_data)
+    else:
+        await manager.send_personal_message(msg_data, target_id)
+
     db.close()
     return {"status": "sent"}
 
@@ -452,6 +502,18 @@ async def send_alert(alert: dict, authorization: str = Header(None)):
     )
     db.add(new_alert)
     db.commit()
+
+    # Real-time broadcast
+    msg_data = {
+        "id": new_alert.id,
+        "user_id": new_alert.user_id,
+        "message": new_alert.message,
+        "from_username": new_alert.from_username,
+        "type": new_alert.type,
+        "time": new_alert.time
+    }
+    await manager.send_personal_message(msg_data, alert["user_id"])
+
     db.close()
     return {"status": "sent"}
 
@@ -476,6 +538,29 @@ async def clear_my_alerts(authorization: str = Header(None)):
         db.commit()
     db.close()
     return {"status": "success"}
+
+@app.websocket("/ws/{token}")
+async def websocket_endpoint(websocket: WebSocket, token: str):
+    if token not in sessions:
+        await websocket.close(code=4001)
+        return
+
+    username = sessions[token]
+    db = SessionLocal()
+    user = db.query(UserProfile).filter(func.lower(UserProfile.username) == username.lower()).first()
+    db.close()
+
+    if not user:
+        await websocket.close(code=4001)
+        return
+
+    await manager.connect(user.id, websocket)
+    try:
+        while True:
+            # Keep connection alive
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(user.id)
 
 @app.post("/logout")
 async def logout(request: Request):

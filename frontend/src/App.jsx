@@ -83,294 +83,6 @@ const RiskGauge = ({ score, level }) => {
     );
 };
 
-/* ─────────── DEV CONSOLE ─────────── */
-const DevConsole = ({ user, token, onLogout }) => {
-    const [pending, setPending] = useState([]);
-    const [stats, setStats] = useState(null);
-    const [history, setHistory] = useState([]);
-    const [commsUsers, setCommsUsers] = useState([]);
-    const [devMessages, setDevMessages] = useState([]);
-    const [commsTarget, setCommsTarget] = useState(0);
-    const [commsMsgText, setCommsMsgText] = useState('');
-    const [activeTab, setActiveTab] = useState('queue');
-    const [processing, setProcessing] = useState(null);
-    const [msgSending, setMsgSending] = useState(false);
-
-    const fetchAll = async () => {
-        const [p, s, h, users_data, msgs_data] = await Promise.all([
-            API.get('/dev/pending', { headers: { Authorization: token } }).catch(() => ({ data: [] })),
-            API.get('/dev/stats', { headers: { Authorization: token } }).catch(() => ({ data: null })),
-            API.get('/transaction-history', { headers: { Authorization: token } }).catch(() => ({ data: [] })),
-            API.get('/dev/users', { headers: { Authorization: token } }).catch(() => ({ data: [] })),
-            API.get('/dev/messages', { headers: { Authorization: token } }).catch(() => ({ data: [] })),
-        ]);
-        setPending(p.data);
-        setStats(s.data);
-        setHistory(h.data);
-        setCommsUsers(users_data.data);
-        setDevMessages(msgs_data.data);
-    };
-
-    useEffect(() => { fetchAll(); const id = setInterval(fetchAll, 8000); return () => clearInterval(id); }, []);
-
-    const review = async (id, action) => {
-        setProcessing(id);
-        try {
-            await API.patch(`/dev/transactions/${id}/review`, { action }, { headers: { Authorization: token } });
-            await fetchAll();
-        } catch (e) { console.error(e); }
-        setProcessing(null);
-    };
-
-    const handleWipeData = async () => {
-        const confirm1 = window.confirm("WARNING: This will permanently eradicate all transaction history and system alerts. User accounts will be preserved.\n\nProceed with system wipe?");
-        if (!confirm1) return;
-        const confirm2 = window.confirm("FINAL CONFIRMATION: Are you absolutely sure you want to hard reset the database metrics?");
-        if (!confirm2) return;
-
-        try {
-            await API.delete('/dev/wipe', { headers: { Authorization: token } });
-            alert("System wiped successfully. Metrics reset to zero.");
-            await fetchAll();
-        } catch (e) { console.error(e); alert("Wipe failed."); }
-    };
-
-    const handleSendMessage = async (e) => {
-        e.preventDefault();
-        if (!commsMsgText.trim()) return;
-        setMsgSending(true);
-        try {
-            await API.post('/dev/message', { target_id: Number(commsTarget), message: commsMsgText }, { headers: { Authorization: token } });
-            setCommsMsgText('');
-            await fetchAll();
-        } catch (e) { console.error(e); }
-        setMsgSending(false);
-    };
-
-    const riskBadge = (score) => {
-        const c = score <= 30 ? '#10b981' : score <= 60 ? '#f59e0b' : '#ef4444';
-        return <span style={{ background: `${c}22`, color: c, padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, fontFamily: 'monospace' }}>{score}</span>;
-    };
-
-    const tabs = [
-        { id: 'queue', label: `⏳ Review Queue (${pending.length})` },
-        { id: 'history', label: '📋 Transaction Log' },
-        { id: 'accounts', label: '👥 Account Registry' },
-        { id: 'stats', label: '⚡ System Stats' },
-        { id: 'comms', label: '📡 Direct Comms' },
-    ];
-
-    return (
-        <div style={{ background: '#0a0a0f', minHeight: '100vh', color: '#e2e8f0', fontFamily: "'JetBrains Mono', monospace", display: 'flex', flexDirection: 'column' }}>
-            {/* Header */}
-            <div style={{ background: '#110a0a', borderBottom: '1px solid #ef444430', padding: '16px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'radial-gradient(circle, #ef4444, #7f1d1d)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px #ef444455' }}>
-                        <Activity size={22} color="#fff" />
-                    </div>
-                    <div>
-                        <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.1em', color: '#ef4444' }}>DEV TERMINAL v4.0</div>
-                        <div style={{ fontSize: 10, color: '#64748b', letterSpacing: '0.15em' }}>SECUREPAY BACKEND CONSOLE · {user.name.toUpperCase()}</div>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
-                    <span style={{ fontSize: 10, color: '#64748b' }}>LIVE</span>
-                    <button onClick={onLogout} style={{ background: '#ef444415', border: '1px solid #ef444435', color: '#ef4444', padding: '6px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>LOGOUT</button>
-                </div>
-            </div>
-
-            {/* Tabs */}
-            <div style={{ display: 'flex', gap: 4, padding: '16px 28px 0', borderBottom: '1px solid #1e293b' }}>
-                {tabs.map(t => (
-                    <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-                        background: activeTab === t.id ? '#ef444415' : 'transparent',
-                        border: `1px solid ${activeTab === t.id ? '#ef444435' : '#1e293b'}`,
-                        borderBottom: activeTab === t.id ? '2px solid #ef4444' : '2px solid transparent',
-                        color: activeTab === t.id ? '#ef4444' : '#64748b',
-                        padding: '10px 20px', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', borderRadius: '8px 8px 0 0'
-                    }}>{t.label}</button>
-                ))}
-            </div>
-
-            {/* Content */}
-            <div style={{ flex: 1, padding: '24px 28px', overflowY: 'auto' }}>
-                {/* REVIEW QUEUE */}
-                {activeTab === 'queue' && (
-                    <div>
-                        <div style={{ marginBottom: 16, fontSize: 10, color: '#64748b', letterSpacing: '0.15em' }}>PENDING HIGH-RISK TRANSFERS AWAITING DEV CLEARANCE</div>
-                        {pending.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: 60, color: '#334155' }}>
-                                <ShieldCheck size={48} style={{ margin: '0 auto 12px', display: 'block', color: '#10b98140' }} />
-                                <div style={{ fontSize: 12 }}>No pending transactions. All clear.</div>
-                            </div>
-                        ) : pending.map(t => (
-                            <div key={t.id} style={{ background: '#0f172a', border: '1px solid #ef444425', borderLeft: '3px solid #ef4444', borderRadius: 12, padding: '16px 20px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 16 }}>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                                        <span style={{ fontSize: 10, color: '#64748b', fontFamily: 'monospace' }}>TXN #{t.id} · {new Date(t.time).toLocaleString()}</span>
-                                        {riskBadge(t.risk_score)}
-                                        <span style={{ background: '#f59e0b22', color: '#f59e0b', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700 }}>{t.risk_level}</span>
-                                    </div>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>
-                                        ${t.amount?.toLocaleString()} {t.base_currency} → {t.target_currency}
-                                    </div>
-                                    <div style={{ fontSize: 10, color: '#475569' }}>
-                                        📍 {t.location} · 🖥 {t.device}
-                                    </div>
-                                </div>
-                                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                                    <button onClick={() => review(t.id, 'approve')} disabled={processing === t.id} style={{ background: '#10b98115', border: '1px solid #10b98135', color: '#10b981', padding: '8px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', fontWeight: 700 }}>
-                                        {processing === t.id ? '...' : '✓ APPROVE'}
-                                    </button>
-                                    <button onClick={() => review(t.id, 'deny')} disabled={processing === t.id} style={{ background: '#ef444415', border: '1px solid #ef444435', color: '#ef4444', padding: '8px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', fontWeight: 700 }}>
-                                        {processing === t.id ? '...' : '✗ DENY'}
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* TRANSACTION LOG */}
-                {activeTab === 'history' && (
-                    <div>
-                        <div style={{ marginBottom: 16, fontSize: 10, color: '#64748b', letterSpacing: '0.15em' }}>FULL TRANSACTION AUDIT LOG</div>
-                        <div className="table-responsive">
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, minWidth: '600px' }}>
-                                <thead>
-                                    <tr style={{ color: '#475569', borderBottom: '1px solid #1e293b' }}>
-                                        {['ID', 'TIME', 'AMOUNT', 'STATUS', 'RISK'].map(h => <th key={h} style={{ textAlign: 'left', padding: '8px 12px', fontWeight: 700, letterSpacing: '0.1em' }}>{h}</th>)}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {history.map(t => (
-                                        <tr key={t.id} style={{ borderBottom: '1px solid #0f172a' }}>
-                                            <td style={{ padding: '10px 12px', color: '#64748b' }}>#{t.id}</td>
-                                            <td style={{ padding: '10px 12px', color: '#64748b' }}>{new Date(t.time).toLocaleString()}</td>
-                                            <td style={{ padding: '10px 12px', fontWeight: 700 }}>${t.amount?.toLocaleString()}</td>
-                                            <td style={{ padding: '10px 12px' }}>
-                                                <span style={{ background: t.approved ? '#10b98120' : '#ef444418', color: t.approved ? '#10b981' : '#ef4444', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
-                                                    {t.approved ? 'AUTHORIZED' : 'DENIED'}
-                                                </span>
-                                            </td>
-                                            <td style={{ padding: '10px 12px' }}>{riskBadge(t.risk_score)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
-
-                {/* SYSTEM STATS */}
-                {activeTab === 'stats' && stats && (
-                    <div>
-                        <div style={{ marginBottom: 16, fontSize: 10, color: '#64748b', letterSpacing: '0.15em', display: 'flex', justifyContent: 'space-between' }}>
-                            <span>LIVE SYSTEM METRICS</span>
-                            <span style={{ color: '#ef4444' }}>CRITICAL MAINTENANCE PANEL</span>
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
-                            {[
-                                { label: 'Total Transactions', value: stats.total_transactions, color: '#60a5fa' },
-                                { label: 'Pending Review', value: stats.pending, color: '#f59e0b' },
-                                { label: 'Authorized', value: stats.approved, color: '#10b981' },
-                                { label: 'Denied', value: stats.denied, color: '#ef4444' },
-                                { label: 'Registered Users', value: stats.total_users, color: '#a78bfa' },
-                            ].map(s => (
-                                <div key={s.label} style={{ background: '#0f172a', border: `1px solid ${s.color}20`, borderRadius: 12, padding: '20px 24px' }}>
-                                    <div style={{ fontSize: 9, color: '#64748b', letterSpacing: '0.15em', marginBottom: 8 }}>{s.label.toUpperCase()}</div>
-                                    <div style={{ fontSize: 32, fontWeight: 900, color: s.color }}>{s.value}</div>
-                                </div>
-                            ))}
-                        </div>
-                        <div style={{ marginTop: 32, padding: 24, background: '#ef444405', border: '1px dashed #ef444430', borderRadius: 12, textAlign: 'center' }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444', marginBottom: 8 }}>HARD RESET PROTOCOL</div>
-                            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 16 }}>Execute this protocol to completely purge all transactional history and alerts. User identities will be preserved.</div>
-                            <button onClick={handleWipeData} style={{ background: '#7f1d1d', border: '1px solid #ef4444', color: '#fca5a5', padding: '10px 24px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', fontWeight: 900, letterSpacing: '0.1em' }}>
-                                INITIATE DATABASE WIPE
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* ACCOUNT REGISTRY */}
-                {activeTab === 'accounts' && (
-                    <div style={{ marginTop: '-20px' }}>
-                        <UserManagement token={token} user={user} />
-                    </div>
-                )}
-
-                {/* DIRECT COMMS */}
-                {activeTab === 'comms' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                        {/* SEND MESSAGE */}
-                        <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: '20px' }}>
-                            <div style={{ marginBottom: 16, fontSize: 10, color: '#64748b', letterSpacing: '0.15em' }}>SEND DIRECT PROTOCOL MESSAGE</div>
-                            <form onSubmit={handleSendMessage} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: 10, color: '#94a3b8', marginBottom: 6 }}>RECIPIENT(S)</label>
-                                    <select value={commsTarget} onChange={(e) => setCommsTarget(e.target.value)} style={{ width: '100%', background: '#0a0a0f', border: '1px solid #1e293b', color: '#e2e8f0', padding: '10px 14px', borderRadius: 8, fontSize: 12, fontFamily: 'inherit' }}>
-                                        <option value={0}>[ GLOBAL BROADCAST - ALL ACCOUNTS ]</option>
-                                        {commsUsers.filter(u => u.role !== 'dev').map(u => (
-                                            <option key={u.id} value={u.id}>{u.username.toUpperCase()} ({u.role})</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: 10, color: '#94a3b8', marginBottom: 6 }}>MESSAGE BODY</label>
-                                    <textarea value={commsMsgText} onChange={(e) => setCommsMsgText(e.target.value)} placeholder="Enter encrypted text..." style={{ width: '100%', minHeight: 100, background: '#0a0a0f', border: '1px solid #1e293b', color: '#e2e8f0', padding: '12px 14px', borderRadius: 8, fontSize: 12, fontFamily: 'inherit', resize: 'vertical' }} required />
-                                </div>
-                                <button type="submit" disabled={msgSending} style={{ background: '#ef444420', border: '1px solid #ef444450', color: '#ef4444', padding: '12px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', fontWeight: 700, letterSpacing: '0.05em' }}>
-                                    {msgSending ? 'TRANSMITTING...' : 'INITIATE TRANSMISSION'}
-                                </button>
-                            </form>
-                        </div>
-                        {/* INBOX */}
-                        <div>
-                            <div style={{ marginBottom: 16, fontSize: 10, color: '#64748b', letterSpacing: '0.15em', display: 'flex', justifyContent: 'space-between' }}>
-                                <span>SECURE INBOX</span>
-                                <span>{devMessages.length} ALERTS</span>
-                            </div>
-                            {devMessages.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: 40, border: '1px dashed #1e293b', borderRadius: 12, color: '#475569', fontSize: 12 }}>Inbox is empty.</div>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                    {devMessages.map(m => (
-                                        <div key={m.id} style={{ background: '#0f172a', borderLeft: '2px solid #3b82f6', padding: '16px', borderRadius: '0 8px 8px 0', position: 'relative' }} className="group">
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                                <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd' }}>{m.from_username || 'SYSTEM'}</div>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <div style={{ fontSize: 9, color: '#64748b' }}>{new Date(m.time).toLocaleString()}</div>
-                                                    <button
-                                                        onClick={() => {
-                                                            if (window.confirm("Purge this transmission from local registry?")) {
-                                                                API.delete(`/alerts/${m.id}`, { headers: { Authorization: token } })
-                                                                    .then(() => setDevMessages(prev => prev.filter(x => x.id !== m.id)))
-                                                                    .catch(e => alert(e.response?.data?.detail || "Purge failed"));
-                                                            }
-                                                        }}
-                                                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, opacity: 0.3, transition: 'opacity 0.2s' }}
-                                                        onMouseOver={e => e.currentTarget.style.opacity = '1'}
-                                                        onMouseOut={e => e.currentTarget.style.opacity = '0.3'}
-                                                        title="Purge Message"
-                                                    >
-                                                        <Trash2 size={10} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div style={{ fontSize: 12, color: '#e2e8f0', lineHeight: 1.5 }}>{m.message}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
 
 
 const PAGE_META = {
@@ -458,6 +170,23 @@ const App = () => {
     const [selectedProvider, setSelectedProvider] = useState(null);
     const [apiError, setApiError] = useState(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [wsConnected, setWsConnected] = useState(false);
+
+    useEffect(() => {
+        if (!user || !token) return;
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = API.defaults.baseURL.replace('http://', '').replace('https://', '');
+        const ws = new WebSocket(`${protocol}//${host}/ws/${token}`);
+
+        ws.onopen = () => setWsConnected(true);
+        ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            setMessages(prev => [msg, ...prev]);
+        };
+        ws.onclose = () => setWsConnected(false);
+
+        return () => ws.close();
+    }, [user, token]);
     const [isExecuting, setIsExecuting] = useState(false);
     const [settlementReceipt, setSettlementReceipt] = useState(null);
 
@@ -967,9 +696,9 @@ const App = () => {
                 </div>
             );
             case 'admin_stats': return <AdminStats token={token} />;
-            case 'admin_messages': return <AdminMessages token={token} />;
+            case 'admin_messages': return <AdminMessages user={user} token={token} messages={messages} setMessages={setMessages} />;
             case 'users': return <UserManagement token={token} user={user} />;
-            case 'alerts': return <AlertList token={token} user={user} />;
+            case 'alerts': return <AlertList token={token} user={user} messages={messages} setMessages={setMessages} />;
             default: return renderOptimizer();
         }
     };
@@ -1437,192 +1166,178 @@ const DevConsole = ({ user, token, onLogout }) => {
 };
 
 /* ─────────── ALERT / INBOX SYSTEM ─────────── */
-const AlertList = ({ token, user }) => {
-    const [alerts, setAlerts] = useState([]);
-    const [msgText, setMsgText] = useState('');
-    const [sending, setSending] = useState(false);
-    const [sent, setSent] = useState(false);
-
-    useEffect(() => {
-        const fetchAlerts = async () => {
-            try {
-                const resp = await API.get(`/alerts/${user.id}`, { headers: { Authorization: token } });
-                setAlerts(resp.data);
-            } catch (e) { console.error(e); }
-        };
-        fetchAlerts();
-    }, [token, user.id]);
-
-    const handleSendToAdmin = async (e) => {
-        e.preventDefault();
-        if (!msgText.trim()) return;
-        setSending(true);
-        try {
-            await API.post('/user/message', { user_id: user.id, username: user.name, message: msgText }, { headers: { Authorization: token } });
-            setMsgText('');
-            setSent(true);
-            setTimeout(() => setSent(false), 3000);
-        } catch (e) { console.error(e); }
-        setSending(false);
-    };
-
-    const handleClearAlerts = async () => {
-        if (!window.confirm("Clear all alerts in your inbox?")) return;
-        try {
-            await API.delete('/alerts/clear', { headers: { Authorization: token } });
-            setAlerts([]);
-        } catch (e) { alert(e.response?.data?.detail || "Clear failed"); }
-    };
-
+const AlertList = ({ user, token, messages, setMessages }) => {
     return (
         <div className="animate-in-up space-y-6">
             <div className="card">
                 <div className="card-header flex justify-between items-center">
-                    <h3>Message Inbox & Security Broadcasts</h3>
-                    {alerts.length > 0 && (
-                        <button onClick={handleClearAlerts} className="text-[10px] text-red-500 hover:text-red-400 font-bold uppercase underline">Clear All Alerts</button>
-                    )}
+                    <h3>Secure Support Chat</h3>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-blue-500 uppercase">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                        Live with Support
+                    </div>
                 </div>
                 <div className="card-body">
-                    {alerts.length === 0 ? (
-                        <div className="text-center py-12 opacity-30"><Shield size={40} className="mx-auto mb-4" />No active messages or broadcasts.</div>
+                    <ChatInterface user={user} token={token} messages={messages} setMessages={setMessages} isAdmin={false} />
+                </div>
+            </div>
+
+            <div className="card">
+                <div className="card-header"><h3>Security Broadcasts</h3></div>
+                <div className="card-body">
+                    {messages.filter(m => m.type === 'info').length === 0 ? (
+                        <div className="text-center py-12 opacity-30"><Shield size={40} className="mx-auto mb-4" />No security alerts at this time.</div>
                     ) : (
                         <div className="space-y-4">
-                            {alerts.map(a => {
-                                const isDevMessage = a.from_username === 'DEVOPS' || a.from_username?.toLowerCase() === 'pramodhraja';
-                                const canDelete = user.role === 'dev' || !isDevMessage;
-                                return (
-                                    <div key={a.id} className={`p-4 rounded-2xl border ${a.type === 'threat' ? 'bg-red-500/10 border-red-500/20' : 'bg-blue-500/10 border-blue-500/20'}`}>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className={`text-[10px] font-bold uppercase ${a.type === 'threat' ? 'text-red-400' : 'text-blue-400'}`}>{a.type === 'threat' ? '⚠️ Security Alert' : '📩 Admin Message'}</div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="text-[10px] opacity-40">{new Date(a.time).toLocaleString()}</div>
-                                                {canDelete && (
-                                                    <button
-                                                        onClick={() => {
-                                                            if (window.confirm("Delete this alert?")) {
-                                                                API.delete(`/alerts/${a.id}`, { headers: { Authorization: token } })
-                                                                    .then(() => setAlerts(prev => prev.filter(x => x.id !== a.id)))
-                                                                    .catch(e => alert(e.response?.data?.detail || "Delete failed"));
-                                                            }
-                                                        }}
-                                                        className="opacity-20 hover:opacity-100 hover:text-red-500 transition-all"
-                                                        title="Delete Alert"
-                                                    >
-                                                        <Trash2 size={12} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <p className="text-sm opacity-80">{a.message}</p>
+                            {messages.filter(m => m.type === 'info').map((m, i) => (
+                                <div key={i} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-[10px] font-bold text-slate-400">{new Date(m.time).toLocaleString()}</span>
                                     </div>
-                                );
-                            })}
+                                    <div className="text-sm font-medium">{m.message}</div>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
             </div>
-
-            {/* Compose panel — only for non-admin users */}
-            {user.role !== 'admin' && (
-                <div className="card">
-                    <div className="card-header"><h3>Contact Admin Support</h3></div>
-                    <div className="card-body">
-                        <form onSubmit={handleSendToAdmin} className="space-y-4">
-                            <textarea
-                                value={msgText}
-                                onChange={e => setMsgText(e.target.value)}
-                                placeholder="Describe your issue or question and the admin team will respond…"
-                                rows={4}
-                                className="w-full p-4 bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl text-sm resize-none focus:outline-none focus:border-blue-400 transition-colors"
-                                required
-                            />
-                            <div className="flex items-center gap-4">
-                                <button type="submit" disabled={sending} className="btn-primary flex items-center gap-2" style={{ width: 'auto', padding: '12px 24px' }}>
-                                    <Send size={14} /> {sending ? 'Sending…' : 'Send to Admin'}
-                                </button>
-                                {sent && <span className="text-xs text-emerald-500 font-bold flex items-center gap-1"><ShieldCheck size={14} /> Message delivered</span>}
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
 
 /* ─────────── ADMIN MESSAGE INBOX ─────────── */
-const AdminMessages = ({ token }) => {
-    const [messages, setMessages] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        API.get('/admin/messages', { headers: { Authorization: token } })
-            .then(r => { setMessages(r.data); setLoading(false); })
-            .catch(() => setLoading(false));
-    }, [token]);
-
-    const handleClearInbox = async () => {
-        if (!window.confirm("Clear all support messages? This cannot be undone.")) return;
-        try {
-            await API.delete('/admin/messages/clear', { headers: { Authorization: token } });
-            setMessages([]);
-        } catch (e) { alert(e.response?.data?.detail || "Clear failed"); }
-    };
-
-    if (loading) return <div className="p-12 text-center opacity-40">Loading messages…</div>;
-
+const AdminMessages = ({ user, token, messages, setMessages }) => {
     return (
-        <div className="card animate-in-up">
-            <div className="card-header flex justify-between items-center">
-                <h3>User Support Inbox</h3>
-                <div className="flex items-center gap-4">
-                    {messages.length > 0 && (
-                        <button onClick={handleClearInbox} className="text-[10px] text-red-500 hover:text-red-400 font-bold uppercase underline">Clear Support Inbox</button>
-                    )}
-                    <div className="tag">{messages.length} message{messages.length !== 1 ? 's' : ''}</div>
+        <div className="animate-in-up">
+            <div className="page-header">
+                <div className="flex items-center gap-3">
+                    <div className="bg-emerald-500 p-2 rounded-lg text-white shadow-lg shadow-emerald-500/30"><MessageSquare size={18} /></div>
+                    <div>
+                        <h3 className="text-2xl font-black tracking-tight">Support Hub</h3>
+                        <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest opacity-70">Real-time User Inquiries</div>
+                    </div>
                 </div>
             </div>
-            <div className="card-body">
-                {messages.length === 0 ? (
-                    <div className="text-center py-12 opacity-30"><Send size={40} className="mx-auto mb-4" />No messages from users yet.</div>
-                ) : (
-                    <div className="space-y-4">
-                        {messages.map(m => (
-                            <div key={m.id} className="p-4 bg-[var(--bg-primary)] border border-[var(--border)] rounded-2xl group relative">
-                                <div className="flex justify-between items-center mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center font-bold text-xs">
-                                            {(m.from_username || 'U')[0].toUpperCase()}
-                                        </div>
-                                        <span className="text-xs font-bold">{m.from_username || 'Unknown User'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="text-[10px] opacity-40">{new Date(m.time).toLocaleString()}</div>
-                                        <button
-                                            onClick={() => {
-                                                if (window.confirm("Delete this user message?")) {
-                                                    API.delete(`/alerts/${m.id}`, { headers: { Authorization: token } })
-                                                        .then(() => setMessages(prev => prev.filter(x => x.id !== m.id)))
-                                                        .catch(e => alert(e.response?.data?.detail || "Delete failed"));
-                                                }
-                                            }}
-                                            className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all"
-                                            title="Delete Message"
-                                        >
-                                            <Trash2 size={12} />
-                                        </button>
-                                    </div>
+            <ChatInterface user={user} token={token} messages={messages} setMessages={setMessages} isAdmin={true} />
+        </div>
+    );
+};
+/* ─────────── CHAT INTERFACE ─────────── */
+const ChatInterface = ({ user, token, messages, setMessages, isAdmin = false }) => {
+    const [msgText, setMsgText] = useState('');
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [allUsers, setAllUsers] = useState([]);
+    const messagesEndRef = useRef(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        if (isAdmin) {
+            API.get('/dev/users', { headers: { Authorization: token } })
+                .then(res => setAllUsers(res.data.filter(u => u.role !== 'admin')))
+                .catch(console.error);
+        }
+    }, [isAdmin, token]);
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
+    const handleSend = async (e) => {
+        e.preventDefault();
+        if (!msgText.trim()) return;
+        if (isAdmin && !selectedUser) return;
+
+        try {
+            const payload = isAdmin
+                ? { user_id: selectedUser.id, message: msgText }
+                : { message: msgText };
+
+            const endpoint = isAdmin ? '/admin/alerts' : '/user/message';
+            await API.post(endpoint, payload, { headers: { Authorization: token } });
+
+            // Add to local state immediately for better UX
+            const newMsg = {
+                id: Date.now(),
+                from_username: user.username,
+                message: msgText,
+                time: new Date().toISOString(),
+                user_id: isAdmin ? selectedUser.id : user.id,
+                from_user_id: user.id
+            };
+            setMessages(prev => [newMsg, ...prev]);
+            setMsgText('');
+        } catch (e) { console.error(e); }
+    };
+
+    const filteredMessages = isAdmin
+        ? messages.filter(m => m.user_id === selectedUser?.id || m.from_user_id === selectedUser?.id)
+        : messages;
+
+    return (
+        <div className="chat-container">
+            {isAdmin && (
+                <div className="chat-sidebar">
+                    <div className="p-4 font-bold border-bottom text-slate-500 text-[10px] uppercase tracking-wider">Conversations</div>
+                    <div className="overflow-y-auto flex-1">
+                        {allUsers.map(u => (
+                            <div
+                                key={u.id}
+                                className={`chat-user-item ${selectedUser?.id === u.id ? 'active' : ''}`}
+                                onClick={() => setSelectedUser(u)}
+                            >
+                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-500 font-bold">
+                                    {u.username[0].toUpperCase()}
                                 </div>
-                                <p className="text-sm opacity-80 leading-relaxed pl-9">{m.message}</p>
+                                <div className="flex-1 min-width-0">
+                                    <div className="font-bold text-sm truncate">{u.username}</div>
+                                    <div className="text-[10px] text-slate-400">Secure Line Active</div>
+                                </div>
                             </div>
                         ))}
                     </div>
+                </div>
+            )}
+
+            <div className="chat-main">
+                <div className="chat-messages">
+                    {isAdmin && !selectedUser ? (
+                        <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+                            Select a user to begin transmission
+                        </div>
+                    ) : (
+                        <>
+                            {filteredMessages.slice().reverse().map((m, i) => (
+                                <div key={m.id || i} className={`message-bubble ${m.from_username === user.username ? 'message-sent' : 'message-received'}`}>
+                                    <div>{m.message}</div>
+                                    <span className="message-time">{new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                            ))}
+                            <div ref={messagesEndRef} />
+                        </>
+                    )}
+                </div>
+
+                {(!isAdmin || selectedUser) && (
+                    <form onSubmit={handleSend} className="chat-input-area">
+                        <input
+                            type="text"
+                            placeholder="Type a message..."
+                            value={msgText}
+                            onChange={(e) => setMsgText(e.target.value)}
+                        />
+                        <button type="submit" className="chat-send-btn">
+                            <Send size={18} />
+                        </button>
+                    </form>
                 )}
             </div>
         </div>
     );
 };
+
 const UserManagement = ({ token, user }) => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
