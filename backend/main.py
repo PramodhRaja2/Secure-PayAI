@@ -646,6 +646,22 @@ async def get_history(request: Request):
         } for t in txns
     ]
 
+@app.delete("/admin/clear-ledger")
+async def clear_ledger(request: Request):
+    """Wipe all transactions and alerts from the cloud database. Admin only."""
+    token = request.headers.get("Authorization")
+    db = SessionLocal()
+    requester = db.query(UserProfile).filter(UserProfile.username == token).first()
+    if not requester or requester.role not in ("admin", "dev"):
+        db.close()
+        raise HTTPException(status_code=403, detail="Forbidden: Admin or Dev access required")
+    
+    deleted_txns = db.query(Transaction).delete()
+    deleted_alerts = db.query(Alert).delete()
+    db.commit()
+    db.close()
+    return {"status": "success", "deleted_transactions": deleted_txns, "deleted_alerts": deleted_alerts}
+
 @app.get("/admin/stats")
 async def get_admin_stats(request: Request):
     db = SessionLocal()
