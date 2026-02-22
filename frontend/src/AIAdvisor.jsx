@@ -1,11 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
 import { Send, Activity, ShieldCheck, Sparkles } from 'lucide-react';
+import API from './api';
 
-const API = axios.create({
-    baseURL: 'https://secure-payai.onrender.com', // Force match main App config
-    headers: { 'Bypass-Tunnel-Reminder': 'true' }
-});
 
 const AIAdvisor = ({ user, token }) => {
     const [messages, setMessages] = useState([

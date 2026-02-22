@@ -17,11 +17,8 @@ import {
 import AIAdvisor from './AIAdvisor';
 import { GLOBAL_CITIES } from './citiesData';
 import ThreatMap from './ThreatMap';
+import API from './api';
 
-const API = axios.create({
-    baseURL: 'https://secure-payai.onrender.com',
-    headers: { 'Bypass-Tunnel-Reminder': 'true' }
-});
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler);
 

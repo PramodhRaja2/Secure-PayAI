@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import InteractiveGlobe from './InteractiveGlobe';
 import { GLOBAL_CITIES } from './citiesData';
+import API from './api';
 
 // Map currency codes to their main financial hub city IDs
 const CURRENCY_TO_CITY = {
@@ -31,23 +32,19 @@ const ThreatMap = ({ transactions, optimizerRoute, miniMode, userRole, token }) 
         if (!window.confirm("NUCLEAR PROTOCOL: This will PERMANENTLY WIPE the cloud ledger. Proceed?")) return;
         setIsClearing(true);
         try {
-            const resp = await fetch('https://secure-payai.onrender.com/admin/clear-ledger', {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': token,
-                    'Bypass-Tunnel-Reminder': 'true'
-                }
+            const resp = await API.delete('/admin/clear-ledger', {
+                headers: { 'Authorization': token }
             });
-            const data = await resp.json();
-            if (resp.ok) {
-                alert(`Ledger Purged. Deleted ${data.deleted_transactions} transactions.`);
+            if (resp.status === 200) {
+                alert(`Ledger Purged. Deleted ${resp.data.deleted_transactions} transactions.`);
                 window.location.reload(); // Refresh to clear local state
             } else {
-                alert(data.detail || "Purge failed");
+                alert(resp.data?.detail || "Purge failed");
             }
         } catch (e) { console.error(e); alert("Connection failed"); }
-        setIsClearing(false);
+        finally { setIsClearing(false); }
     };
+
 
     useEffect(() => {
         if (transactions && transactions.length > 0) {
