@@ -2,9 +2,18 @@ import os
 from dotenv import load_dotenv
 import google.generativeai as genai
 
-load_dotenv()
-if os.getenv("GEMINI_API_KEY"):
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# Load environment variables with absolute path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+dotenv_path = os.path.join(BASE_DIR, '.env')
+load_dotenv(dotenv_path)
+
+api_key = os.getenv("GEMINI_API_KEY")
+if api_key:
+    print(f"--- QUANTUM CORE: API Key Loaded (starts with: {api_key[:10]}) ---")
+    genai.configure(api_key=api_key)
+else:
+    print("--- CRITICAL ERROR: NO GEMINI_API_KEY FOUND IN ENVIRONMENT ---")
+    print(f"Looking in: {dotenv_path}")
 
 from fastapi import FastAPI, HTTPException, Request, Header
 from pydantic import BaseModel
