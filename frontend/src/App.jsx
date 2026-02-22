@@ -171,6 +171,19 @@ const App = () => {
     const [apiError, setApiError] = useState(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [wsConnected, setWsConnected] = useState(false);
+    const [messages, setMessages] = useState([]);
+
+    const [isExecuting, setIsExecuting] = useState(false);
+    const [settlementReceipt, setSettlementReceipt] = useState(null);
+
+    // Auth State
+    const [user, setUser] = useState(() => {
+        try {
+            const saved = localStorage.getItem('securepay_user');
+            return saved ? JSON.parse(saved) : null;
+        } catch (e) { return null; }
+    });
+    const [token, setToken] = useState(() => localStorage.getItem('securepay_token') || null);
 
     useEffect(() => {
         if (!user || !token) return;
@@ -187,17 +200,7 @@ const App = () => {
 
         return () => ws.close();
     }, [user, token]);
-    const [isExecuting, setIsExecuting] = useState(false);
-    const [settlementReceipt, setSettlementReceipt] = useState(null);
 
-    // Auth State
-    const [user, setUser] = useState(() => {
-        try {
-            const saved = localStorage.getItem('securepay_user');
-            return saved ? JSON.parse(saved) : null;
-        } catch (e) { return null; }
-    });
-    const [token, setToken] = useState(() => localStorage.getItem('securepay_token') || null);
     const [loginUsername, setLoginUsername] = useState('');
     const [loginPass, setLoginPass] = useState('');
     const [authError, setAuthError] = useState('');
@@ -937,11 +940,10 @@ const App = () => {
 };
 
 /* ─────────── DEV CONSOLE ─────────── */
-const DevConsole = ({ user, token, onLogout }) => {
+const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
     const [activeTab, setActiveTab] = useState('overview');
     const [stats, setStats] = useState(null);
     const [pending, setPending] = useState([]);
-    const [messages, setMessages] = useState([]);
     const [devMsg, setDevMsg] = useState('');
     const [targetUser, setTargetUser] = useState('0'); // 0 for all users (broadcast)
     const [users, setUsers] = useState([]); // For user list in broadcast
