@@ -16,7 +16,17 @@ const ThreatMap = ({ transactions, optimizerRoute, miniMode, userRole, token }) 
     const [simRisk, setSimRisk] = useState(15);
     const [locked, setLocked] = useState(true);
     const [isClearing, setIsClearing] = useState(false);
+    const [selectMode, setSelectMode] = useState('origin'); // 'origin' or 'destination'
 
+    const handleCityClick = (city) => {
+        setSimMode(true);
+        if (selectMode === 'origin') {
+            setSimSourceId(city.id);
+            setSelectMode('destination'); // Auto-switch to make it easy to pick pair
+        } else {
+            setSimDestId(city.id);
+        }
+    };
     const handleClearLedger = async () => {
         if (!window.confirm("NUCLEAR PROTOCOL: This will PERMANENTLY WIPE the cloud ledger. Proceed?")) return;
         setIsClearing(true);
@@ -134,9 +144,23 @@ const ThreatMap = ({ transactions, optimizerRoute, miniMode, userRole, token }) 
                 {simMode ? (
                     <div className="mt-4 bg-white/95 backdrop-blur rounded-xl p-4 border border-slate-200 shadow-xl space-y-3">
                         <div className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Route Simulator</div>
+                        <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
+                            <button
+                                onClick={() => setSelectMode('origin')}
+                                className={`flex-1 py-1.5 text-[9px] font-bold uppercase rounded-md transition-all ${selectMode === 'origin' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                Set Origin
+                            </button>
+                            <button
+                                onClick={() => setSelectMode('destination')}
+                                className={`flex-1 py-1.5 text-[9px] font-bold uppercase rounded-md transition-all ${selectMode === 'destination' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                Set Destination
+                            </button>
+                        </div>
                         <div className="flex justify-between items-center gap-2">
                             <select
-                                className="w-full bg-slate-50 border border-slate-200 text-xs rounded-lg p-2 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className={`w-full bg-slate-50 border text-xs rounded-lg p-2 font-bold focus:outline-none transition-all ${selectMode === 'origin' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-200'}`}
                                 value={simSourceId}
                                 onChange={(e) => setSimSourceId(e.target.value)}
                             >
@@ -144,7 +168,7 @@ const ThreatMap = ({ transactions, optimizerRoute, miniMode, userRole, token }) 
                             </select>
                             <span className="text-slate-400 text-xs">→</span>
                             <select
-                                className="w-full bg-slate-50 border border-slate-200 text-xs rounded-lg p-2 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className={`w-full bg-slate-50 border text-xs rounded-lg p-2 font-bold focus:outline-none transition-all ${selectMode === 'destination' ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-200'}`}
                                 value={simDestId}
                                 onChange={(e) => setSimDestId(e.target.value)}
                             >
@@ -206,6 +230,7 @@ const ThreatMap = ({ transactions, optimizerRoute, miniMode, userRole, token }) 
                     globeColor={globeColor}
                     speed={1}
                     locked={locked}
+                    onCityClick={handleCityClick}
                 />
             </div>
         </div>

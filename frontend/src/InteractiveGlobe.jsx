@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import * as d3 from 'd3';
 import * as topojson from 'topojson-client';
 
-export default function InteractiveGlobe({ cities, source, dest, isRouting, globeColor, speed, locked }) {
+export default function InteractiveGlobe({ cities, source, dest, isRouting, globeColor, speed, locked, onCityClick }) {
     const containerRef = useRef(null);
     const svgRef = useRef(null);
     const dataRef = useRef(null);
@@ -242,6 +242,19 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
                     .attr("r", d => (s.routingActive && (d.id === s.source?.id || d.id === s.dest?.id)) ? s.pulseRadius : 0)
                     .attr("stroke", globeColor)
                     .style("opacity", d => (s.routingActive && (d.id === s.source?.id || d.id === s.dest?.id)) ? 1 - (s.pulseRadius / 20) : 0);
+
+                update
+                    .style("cursor", "pointer")
+                    .on("click", (event, d) => {
+                        if (onCityClick) onCityClick(d);
+                    })
+                    .on("mouseover", function () {
+                        d3.select(this).select(".pin-core").attr("r", 7);
+                    })
+                    .on("mouseout", function (event, d) {
+                        const isMain = s.routingActive && (d.id === s.source?.id || d.id === s.dest?.id);
+                        d3.select(this).select(".pin-core").attr("r", isMain ? 5 : 3);
+                    });
 
                 frameId = requestAnimationFrame(render);
             };
