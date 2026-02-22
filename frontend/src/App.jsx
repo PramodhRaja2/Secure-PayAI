@@ -8,7 +8,7 @@ import {
 } from 'chart.js';
 import {
     Shield, TrendingUp, Clock, DollarSign, Activity, Zap, MapPin, Globe,
-    Building, BarChart3, ShieldCheck, FileWarning, Lock,
+    Building, BarChart3, ShieldCheck, ShieldAlert, FileWarning, Lock,
     Eye, Layers, Send, Cpu, History, Settings, MessageSquare,
     Keyboard, MousePointer, Smartphone, Info, Menu, X,
     Loader, Download, ArrowRight, Trash, Trash2
@@ -179,6 +179,7 @@ const App = () => {
 
     const [isExecuting, setIsExecuting] = useState(false);
     const [settlementReceipt, setSettlementReceipt] = useState(null);
+    const [securityBlock, setSecurityBlock] = useState(null); // { score, detail }
 
     // Auth State
     const [user, setUser] = useState(() => {
@@ -293,6 +294,16 @@ const App = () => {
             const res = await API.post('/analyze', payload, { headers: { Authorization: token } });
             setAnalysis(res.data);
             setSelectedProvider(res.data.recommended_route);
+
+            // SECURITY BLOCK TRIGGER
+            if (res.data.risk_report.risk_score > 70) {
+                setSecurityBlock({
+                    score: res.data.risk_report.risk_score,
+                    detail: res.data.risk_report.recommendation_detail,
+                    aml_flags: res.data.risk_report.aml_flags
+                });
+            }
+
             fetchHistory();
         } catch (e) {
             setApiError(e.response?.data?.detail || e.message || 'Analysis failed. API gateway unreachable.');
@@ -1004,6 +1015,8 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
         try {
             await API.patch(`/dev/transactions/${id}/review`, { action }, { headers: { Authorization: token } });
             setPending(prev => prev.filter(t => t.id !== id));
+            // Force refresh history if visible
+            fetchHistory();
         } catch (e) { alert(e.response?.data?.detail || "Review failed"); }
     };
 
@@ -1135,9 +1148,11 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
                                 <div className="text-center py-10 opacity-20">NO_INBOUND_COMMS</div>
                             ) : (
                                 messages.map(m => (
-                                    <div key={m.id} className="p-3 bg-slate-900 border border-slate-800 rounded-xl group relative">
+                                    <div key={m.id} className={`p-3 border rounded-xl group relative ${m.type === 'security_incident' ? 'bg-red-950/40 border-red-500/30' : 'bg-slate-900 border-slate-800'}`}>
                                         <div className="flex justify-between text-[9px] mb-1">
-                                            <span className="text-blue-400 font-bold uppercase tracking-tighter">Sender: {m.from_username || 'SYSTEM'}</span>
+                                            <span className={`${m.type === 'security_incident' ? 'text-red-400' : 'text-blue-400'} font-bold uppercase tracking-tighter`}>
+                                                {m.type === 'security_incident' ? '🚨 SECURITY_INCIDENT' : `Sender: ${m.from_username || 'SYSTEM'}`}
+                                            </span>
                                             <div className="flex items-center gap-2">
                                                 <span className="opacity-40">{new Date(m.time).toLocaleTimeString()}</span>
                                                 <button
@@ -1404,22 +1419,72 @@ const UserManagement = ({ token, user }) => {
                             <div className="text-[9px] uppercase opacity-40 font-black text-white tracking-[0.2em] mb-1">Architect</div>
                             <div className="text-sm font-black text-blue-400 uppercase tracking-widest leading-none">Pramodh Raja</div>
                         </div>
-                        <div className="h-8 w-[1px] bg-white/10"></div>
-                        <div>
-                            <div className="text-[9px] uppercase opacity-40 font-black text-white tracking-[0.2em] mb-1">Institution</div>
-                            <div className="text-xs font-bold text-white/70">
-                                <a href="https://www.bapssathy.ac.in/index.php" target="_blank" rel="noopener noreferrer" className="hover:text-blue-500 underline decoration-blue-500/30 underline-offset-4 transition-all">
-                                    Bannari Amman Public School
-                                </a>
-                            </div>
-                        </div>
-                        <div className="h-8 w-[1px] bg-white/10"></div>
-                        <div className="bg-blue-600/20 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-sm">
-                            <div className="text-[10px] font-black uppercase tracking-widest text-center">Grade XI-B</div>
-                        </div>
                     </div>
                 </div>
             </div>
+
+            {/* NEW: SECURITY BLOCK MODAL */}
+            <AnimatePresence>
+                {securityBlock && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[1000] flex items-center justify-center p-6"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            className="max-w-md w-full bg-slate-900 border border-red-500/50 rounded-3xl overflow-hidden shadow-2xl shadow-red-500/20"
+                        >
+                            <div className="bg-red-600 p-8 flex flex-col items-center text-white text-center">
+                                <div className="bg-white/20 p-4 rounded-full mb-4 animate-pulse">
+                                    <ShieldAlert size={48} />
+                                </div>
+                                <h2 className="text-3xl font-black uppercase tracking-tighter mb-2">Protocol Locked</h2>
+                                <div className="text-xs font-bold bg-white/10 px-3 py-1 rounded-full uppercase tracking-widest">
+                                    Risk Magnitude: {securityBlock.score}%
+                                </div>
+                            </div>
+                            <div className="p-8 space-y-6">
+                                <div className="space-y-4">
+                                    <div className="text-sm font-bold text-slate-400 uppercase tracking-widest text-center">Security Engine Result</div>
+                                    <p className="text-slate-100 text-lg leading-snug font-medium italic text-center">"{securityBlock.detail}"</p>
+
+                                    {securityBlock.aml_flags && securityBlock.aml_flags.length > 0 && (
+                                        <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl">
+                                            <div className="text-[10px] font-black uppercase text-red-500 tracking-widest mb-2">Anomalies Detected</div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {securityBlock.aml_flags.map((f, i) => (
+                                                    <span key={i} className="text-[10px] bg-red-500/20 text-red-400 px-2 py-1 rounded-md font-bold uppercase">{f}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="text-xs text-slate-400 leading-relaxed border-t border-slate-800 pt-6">
+                                    This transaction has been **DENIED** by the integrated Adaptive Guard Kernel.
+                                    The incident has been broadcast to the **Security Terminal** for manual human review and compliance verification.
+                                </div>
+
+                                <div className="flex flex-col gap-3 pt-4">
+                                    <button
+                                        onClick={() => setSecurityBlock(null)}
+                                        className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-slate-700 transition-all border border-slate-700"
+                                    >
+                                        Acknowledge Block
+                                    </button>
+                                    <div className="text-center">
+                                        <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest opacity-50">Status: Awaiting DevOps Override</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

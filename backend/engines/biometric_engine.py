@@ -64,7 +64,7 @@ class BiometricEngine:
                 "factor": "Behavioral Scripting",
                 "icon": "terminal",
                 "status": "critical",
-                "risk_contribution": 35,
+                "risk_contribution": 45,
                 "baseline": "Human Typing (60-80 WPM)",
                 "current": f"{speed} WPM",
                 "deviation": "Non-human input (Paste/Automation)"
@@ -74,7 +74,7 @@ class BiometricEngine:
                 "factor": "Typing Dynamics",
                 "icon": "keyboard",
                 "status": "warning" if dev < 0.6 else "critical",
-                "risk_contribution": int(min(30, dev * 40)),
+                "risk_contribution": int(min(35, dev * 45)),
                 "baseline": f"{profile['typing_speed']} WPM",
                 "current": f"{speed} WPM",
                 "deviation": f"{int(dev*100)}% variance"
@@ -98,7 +98,7 @@ class BiometricEngine:
                 "factor": "Erratic Motion",
                 "icon": "mouse-pointer",
                 "status": "warning" if m_dev < 0.7 else "critical",
-                "risk_contribution": int(min(25, m_dev * 30)),
+                "risk_contribution": int(min(30, m_dev * 40)),
                 "baseline": f"{profile['mouse_velocity']} px/s",
                 "current": f"{vel} px/s",
                 "deviation": "Unusual pathing (Bot-like)"
@@ -124,7 +124,7 @@ class BiometricEngine:
                 "factor": "Impossible Travel",
                 "icon": "plane-takeoff",
                 "status": "critical",
-                "risk_contribution": 45,
+                "risk_contribution": 55,
                 "baseline": "New York",
                 "current": f"Distance: {int(dist)}km in {round(time_diff, 2)}h",
                 "deviation": "Physical travel mismatch"
@@ -134,7 +134,7 @@ class BiometricEngine:
                 "factor": "IP Geolocation",
                 "icon": "map-pin",
                 "status": "warning",
-                "risk_contribution": 20,
+                "risk_contribution": 25,
                 "baseline": profile["ip_location"],
                 "current": current_metrics.get("ip_location"),
                 "deviation": "Unusual access point"
@@ -156,7 +156,7 @@ class BiometricEngine:
                 "factor": "Network Masking",
                 "icon": "shield-off",
                 "status": "critical",
-                "risk_contribution": 25,
+                "risk_contribution": 35,
                 "baseline": "Residential ISP",
                 "current": "VPN/Proxy Detected",
                 "deviation": "High-risk IP Reputation"

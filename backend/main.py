@@ -16,7 +16,7 @@ from services.fx_service import get_live_fx_rates
 from datetime import datetime, timedelta
 import uuid
 from database import init_db, SessionLocal, Transaction, UserProfile, Alert
-from sqlalchemy import func
+from sqlalchemy import func, and_, or_
 import json
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -281,7 +281,10 @@ async def clear_admin_messages(authorization: str = Header(None)):
 @app.get("/dev/pending")
 async def get_pending_transactions():
     db = SessionLocal()
-    pending = db.query(Transaction).filter(Transaction.status == "pending").order_by(Transaction.time.desc()).all()
+    # Pull pending AND high-risk denied for manual override
+    pending = db.query(Transaction).filter(
+        or_(Transaction.status == "pending", and_(Transaction.status == "denied", Transaction.risk_score > 70))
+    ).order_by(Transaction.time.desc()).all()
     db.close()
     return [{"id": t.id, "time": t.time, "amount": t.amount, "base_currency": t.base_currency,
              "target_currency": t.target_currency, "risk_score": t.risk_score, "risk_level": t.risk_level,
@@ -755,14 +758,14 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
     savings = bank_cost - best_route["total_cost_usd"]
     savings_pct = (savings / bank_cost * 100) if bank_cost > 0 else 0
     go_decision = risk_report["risk_score"] <= 60
-    txn_status = "pending" if risk_report["risk_score"] > 60 else "approved"
+    txn_status = "denied" if risk_report["risk_score"] > 70 else ("pending" if risk_report["risk_score"] > 60 else "approved")
     
     # Persist Transaction
     new_txn = Transaction(
         amount=request.amount,
         base_currency=request.base_currency,
         target_currency=request.target_currency,
-        approved=go_decision,
+        approved=go_decision if txn_status == "approved" else False,
         risk_score=risk_report["risk_score"],
         risk_level=risk_report["risk_level"],
         location=request.ip_location,
@@ -772,9 +775,34 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
         status=txn_status
     )
     db.add(new_txn)
+    db.flush() # Get ID for alert if needed
     
-    # Update Profile if legitimate (optional heuristic)
-    if go_decision and risk_report["risk_score"] < 20:
+    # SECURITY BROADCAST: If high risk, notify DevOps immediately
+    if risk_report["risk_score"] > 70:
+        dev = db.query(UserProfile).filter(UserProfile.role == "dev").first()
+        if dev:
+            security_alert = Alert(
+                user_id=dev.id,
+                type="security_incident",
+                message=f"CRITICAL: High Risk Transaction Detected (${request.amount} {request.base_currency} -> {request.target_currency}). Score: {risk_report['risk_score']}. Origin: {request.ip_location}. Status: DENIED - AWAITING OVERRIDE.",
+                from_username="Security Engine"
+            )
+            db.add(security_alert)
+            # Try to push via WebSocket
+            try:
+                alert_payload = {
+                    "id": 9991, # dummy or fetch
+                    "user_id": dev.id,
+                    "from_username": "Security Engine",
+                    "type": "security_incident",
+                    "message": security_alert.message,
+                    "time": now.isoformat()
+                }
+                asyncio.create_task(manager.send_personal_message(alert_payload, dev.id))
+            except: pass
+
+    # Update Profile if legitimate (confirmed low risk)
+    if risk_report["risk_score"] < 20:
         profile_db.last_seen_epoch = now.timestamp()
         profile_db.last_lat_long = f"{request.lat_long[0]},{request.lat_long[1]}" if request.lat_long else profile_db.last_lat_long
         
