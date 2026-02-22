@@ -9,7 +9,7 @@ import {
 import {
     Shield, TrendingUp, Clock, DollarSign, Activity, Zap, MapPin, Globe,
     Building, BarChart3, ShieldCheck, FileWarning, Lock,
-    Eye, Layers, Send, Cpu, History, Settings,
+    Eye, Layers, Send, Cpu, History, Settings, MessageSquare,
     Keyboard, MousePointer, Smartphone, Info, Menu, X,
     Loader, Download, ArrowRight, Trash, Trash2
 } from 'lucide-react';
