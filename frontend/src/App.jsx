@@ -699,7 +699,6 @@ const App = () => {
                 </div>
             );
             case 'admin_stats': return <AdminStats token={token} />;
-            case 'admin_messages': return <AdminMessages user={user} token={token} messages={messages} setMessages={setMessages} />;
             case 'users': return <UserManagement token={token} user={user} />;
             case 'alerts': return <AlertList token={token} user={user} messages={messages} setMessages={setMessages} />;
             default: return renderOptimizer();
@@ -712,7 +711,6 @@ const App = () => {
         {
             title: 'Governance', items: [
                 { id: 'admin_stats', icon: <Activity size={16} />, label: 'Admin Insight', adminOnly: true },
-                { id: 'admin_messages', icon: <Send size={16} />, label: 'User Messages', adminOnly: true },
                 { id: 'users', icon: <Settings size={16} />, label: 'User Management', adminOnly: true },
                 { id: 'alerts', icon: <Zap size={16} />, label: 'Inbox & Broadcasts' }
             ]
@@ -1169,18 +1167,19 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
 
 /* ─────────── ALERT / INBOX SYSTEM ─────────── */
 const AlertList = ({ user, token, messages, setMessages }) => {
+    const isAdmin = user.role === 'admin';
     return (
         <div className="animate-in-up space-y-6">
             <div className="card">
                 <div className="card-header flex justify-between items-center">
-                    <h3>Secure Support Chat</h3>
+                    <h3>{isAdmin ? 'Admin Support Hub' : 'Secure Support Chat'}</h3>
                     <div className="flex items-center gap-2 text-[10px] font-bold text-blue-500 uppercase">
                         <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                        Live with Support
+                        Live with {isAdmin ? 'Users' : 'Support'}
                     </div>
                 </div>
-                <div className="card-body">
-                    <ChatInterface user={user} token={token} messages={messages} setMessages={setMessages} isAdmin={false} />
+                <div className="card-body p-0 overflow-hidden rounded-b-2xl">
+                    <ChatInterface user={user} token={token} messages={messages} setMessages={setMessages} isAdmin={isAdmin} />
                 </div>
             </div>
 
@@ -1207,23 +1206,7 @@ const AlertList = ({ user, token, messages, setMessages }) => {
     );
 };
 
-/* ─────────── ADMIN MESSAGE INBOX ─────────── */
-const AdminMessages = ({ user, token, messages, setMessages }) => {
-    return (
-        <div className="animate-in-up">
-            <div className="page-header">
-                <div className="flex items-center gap-3">
-                    <div className="bg-emerald-500 p-2 rounded-lg text-white shadow-lg shadow-emerald-500/30"><MessageSquare size={18} /></div>
-                    <div>
-                        <h3 className="text-2xl font-black tracking-tight">Support Hub</h3>
-                        <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest opacity-70">Real-time User Inquiries</div>
-                    </div>
-                </div>
-            </div>
-            <ChatInterface user={user} token={token} messages={messages} setMessages={setMessages} isAdmin={true} />
-        </div>
-    );
-};
+
 /* ─────────── CHAT INTERFACE ─────────── */
 const ChatInterface = ({ user, token, messages, setMessages, isAdmin = false }) => {
     const [msgText, setMsgText] = useState('');
