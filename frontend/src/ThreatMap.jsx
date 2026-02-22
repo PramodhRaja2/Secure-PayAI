@@ -1,119 +1,136 @@
-import React, { useRef, useState, useEffect } from 'react';
-import Globe from 'react-globe.gl';
-
-// Coordinate mapping for major currency hubs
-const CURRENCY_HUBS = {
-    'USD': { lat: 38.9072, lng: -77.0369, name: 'New York/DC' },
-    'EUR': { lat: 50.1109, lng: 8.6821, name: 'Frankfurt' },
-    'GBP': { lat: 51.5074, lng: -0.1278, name: 'London' },
-    'INR': { lat: 19.0760, lng: 72.8777, name: 'Mumbai' },
-    'JPY': { lat: 35.6762, lng: 139.6503, name: 'Tokyo' },
-    'AED': { lat: 25.2048, lng: 55.2708, name: 'Dubai' },
-    'NGN': { lat: 6.5244, lng: 3.3792, name: 'Lagos' }
-};
+import React, { useState, useEffect } from 'react';
+import InteractiveGlobe from './InteractiveGlobe';
+import { GLOBAL_CITIES } from './citiesData';
 
 const ThreatMap = ({ transactions }) => {
-    const globeEl = useRef();
-    const [arcsData, setArcsData] = useState([]);
-    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-    const containerRef = useRef(null);
+    const [latest, setLatest] = useState(null);
+    const [simMode, setSimMode] = useState(false);
+    const [simSourceId, setSimSourceId] = useState('NYC');
+    const [simDestId, setSimDestId] = useState('LDN');
+    const [simRisk, setSimRisk] = useState(15);
 
-    // Auto-resize globe
     useEffect(() => {
-        const handleResize = () => {
-            if (containerRef.current) {
-                setDimensions({
-                    width: containerRef.current.offsetWidth,
-                    height: containerRef.current.offsetHeight
-                });
-            }
-        };
-        handleResize();
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    // Initial globe setup
-    useEffect(() => {
-        if (globeEl.current) {
-            // Auto rotate and center on Atlantic
-            globeEl.current.controls().autoRotate = true;
-            globeEl.current.controls().autoRotateSpeed = 0.5;
-            globeEl.current.pointOfView({ lat: 25, lng: -40, altitude: 2.5 });
+        if (transactions && transactions.length > 0) {
+            setLatest(transactions[0]);
         }
-    }, []);
-
-    // Process transactions into arcs
-    useEffect(() => {
-        if (!transactions || transactions.length === 0) return;
-
-        const processedArcs = transactions.map(t => {
-            const startLoc = CURRENCY_HUBS[t.base_currency] || CURRENCY_HUBS['USD'];
-            const endLoc = CURRENCY_HUBS[t.target_currency] || CURRENCY_HUBS['EUR'];
-
-            // If threat/blocked (risk > 60), make it red. Otherwise green.
-            const isThreat = t.risk_score > 60 || (t.status && t.status.includes('denied'));
-            const color = isThreat ? '#ef4444' : '#10b981'; // Tailwind Red-500 : Emerald-500
-
-            return {
-                startLat: startLoc.lat + (Math.random() - 0.5) * 2, // Slight jitter so lines don't perfectly overlap
-                startLng: startLoc.lng + (Math.random() - 0.5) * 2,
-                endLat: endLoc.lat + (Math.random() - 0.5) * 2,
-                endLng: endLoc.lng + (Math.random() - 0.5) * 2,
-                color: [color, color],
-                stroke: isThreat ? 1.5 : 0.5,
-                dashAnimateTime: isThreat ? 1000 : 2000,
-                label: `TXN_${t.id} [${t.base_currency}→${t.target_currency}] Risk: ${t.risk_score}`
-            };
-        });
-
-        // Limit to 50 active arcs to prevent overwhelming the browser
-        setArcsData(processedArcs.slice(0, 50));
     }, [transactions]);
 
+    let source = null;
+    let dest = null;
+    let isRouting = false;
+    let globeColor = '#10b981';
+
+    if (simMode) {
+        source = GLOBAL_CITIES.find(c => c.id === simSourceId) || GLOBAL_CITIES[0];
+        dest = GLOBAL_CITIES.find(c => c.id === simDestId) || GLOBAL_CITIES[1];
+        isRouting = true;
+        const isThreat = simRisk > 60;
+        globeColor = isThreat ? '#ef4444' : '#10b981';
+    } else if (latest) {
+        // Fallback to finding nearest matching city for legacy data, or use defaults
+        source = GLOBAL_CITIES.find(c => c.id === latest.base_currency) || GLOBAL_CITIES.find(c => c.country.includes('USA'));
+        dest = GLOBAL_CITIES.find(c => c.id === latest.target_currency) || GLOBAL_CITIES.find(c => c.country.includes('UK'));
+
+        isRouting = true;
+        const isThreat = latest.risk_score > 60 || (latest.status && latest.status.includes('denied'));
+        globeColor = isThreat ? '#ef4444' : '#10b981'; // Red for threat, Emerald for safe
+    }
+
     return (
-        <div ref={containerRef} className="w-full h-full bg-slate-950 rounded-2xl overflow-hidden relative shadow-inner border border-slate-800">
+        <div className="w-full h-full bg-slate-50 rounded-2xl overflow-hidden relative shadow-inner border border-slate-200">
             {/* Overlay UI */}
-            <div className="absolute top-4 left-4 z-10 pointer-events-none">
-                <h3 className="text-white font-black uppercase tracking-widest text-sm flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Live Global Surveillance
-                </h3>
-                <p className="text-[10px] text-slate-400 font-mono mt-1">
-                    Detecting cross-border anomalies via Orbital Nodes
+            <div className="absolute top-4 left-4 z-10 pointer-events-auto drop-shadow-md max-w-sm">
+                <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-slate-800 font-black uppercase tracking-widest text-sm flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                        Live Global Surveillance
+                    </h3>
+                    <div className="flex gap-2 bg-white rounded-lg p-1 border border-slate-200 shadow-sm ml-4">
+                        <button
+                            className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition-all ${!simMode ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+                            onClick={() => setSimMode(false)}
+                        >Live Feed</button>
+                        <button
+                            className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition-all ${simMode ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+                            onClick={() => setSimMode(true)}
+                        >Simulator</button>
+                    </div>
+                </div>
+
+                <p className="text-[10px] text-slate-500 font-mono mt-1 font-bold">
+                    SecurePay AI Routing Topology
                 </p>
+
+                {simMode ? (
+                    <div className="mt-4 bg-white/95 backdrop-blur rounded-xl p-4 border border-slate-200 shadow-xl space-y-3">
+                        <div className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Route Simulator</div>
+                        <div className="flex justify-between items-center gap-2">
+                            <select
+                                className="w-full bg-slate-50 border border-slate-200 text-xs rounded-lg p-2 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                value={simSourceId}
+                                onChange={(e) => setSimSourceId(e.target.value)}
+                            >
+                                {GLOBAL_CITIES.map(c => <option key={`src-${c.id}`} value={c.id}>{c.name}, {c.country}</option>)}
+                            </select>
+                            <span className="text-slate-400 text-xs">→</span>
+                            <select
+                                className="w-full bg-slate-50 border border-slate-200 text-xs rounded-lg p-2 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                value={simDestId}
+                                onChange={(e) => setSimDestId(e.target.value)}
+                            >
+                                {GLOBAL_CITIES.map(c => <option key={`dst-${c.id}`} value={c.id}>{c.name}, {c.country}</option>)}
+                            </select>
+                        </div>
+                        <div className="pt-2 border-t border-slate-100">
+                            <label className="text-[10px] font-bold text-slate-500 block mb-2 uppercase flex justify-between">
+                                Simulated Risk Score <span className={simRisk > 60 ? 'text-red-500' : 'text-emerald-500'}>{simRisk}</span>
+                            </label>
+                            <input
+                                type="range"
+                                min="0" max="100"
+                                value={simRisk}
+                                onChange={(e) => setSimRisk(Number(e.target.value))}
+                                className="w-full accent-blue-600"
+                            />
+                        </div>
+                    </div>
+                ) : (
+                    latest && (
+                        <div className="mt-4 bg-white/80 backdrop-blur rounded-lg p-3 border border-slate-200 shadow-md inline-block">
+                            <div className="text-[9px] uppercase tracking-widest font-bold text-slate-400 mb-1">Latest Transaction</div>
+                            <div className="flex gap-2 items-center text-xs font-bold text-slate-700">
+                                {source?.name || latest.base_currency} <span className="opacity-50 text-slate-400">→</span> {dest?.name || latest.target_currency}
+                            </div>
+                            <div className={`text-[10px] font-bold mt-1 uppercase ${latest.risk_score > 60 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                Risk Score: {latest.risk_score}
+                            </div>
+                        </div>
+                    )
+                )}
             </div>
 
-            <div className="absolute bottom-4 right-4 z-10 pointer-events-none flex flex-col gap-1 items-end">
-                <div className="flex items-center gap-2 text-[9px] font-bold uppercase text-slate-400 bg-slate-900/50 backdrop-blur px-3 py-1.5 rounded-full">
+            <div className="absolute bottom-4 right-4 z-10 pointer-events-none flex flex-col gap-1 items-end drop-shadow-sm">
+                <div className="flex items-center gap-2 text-[9px] font-bold uppercase text-emerald-600 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-emerald-100">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     Clean Routing
                 </div>
-                <div className="flex items-center gap-2 text-[9px] font-bold uppercase text-slate-400 bg-slate-900/50 backdrop-blur px-3 py-1.5 rounded-full">
+                <div className="flex items-center gap-2 text-[9px] font-bold uppercase text-red-600 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-red-100">
                     <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
                     Threat Intercepted
                 </div>
             </div>
 
-            {/* Globe Canvas */}
-            {dimensions.width > 0 && (
-                <Globe
-                    ref={globeEl}
-                    width={dimensions.width}
-                    height={dimensions.height}
-                    globeImageUrl="//unpkg.com/three-globe/example/img/earth-dark.jpg"
-                    bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
-                    backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
-                    arcsData={arcsData}
-                    arcColor="color"
-                    arcDashLength={0.4}
-                    arcDashGap={0.2}
-                    arcDashAnimateTime="dashAnimateTime"
-                    arcStroke="stroke"
-                    arcLabel="label"
-                    backgroundColor="rgba(0,0,0,0)" // Transparent to show parent bg
+            {/* D3 Interactive Globe */}
+            <div className="absolute inset-0 z-0">
+                <InteractiveGlobe
+                    cities={GLOBAL_CITIES}
+                    source={source}
+                    dest={dest}
+                    isRouting={isRouting}
+                    globeColor={globeColor}
+                    speed={1}
                 />
-            )}
+            </div>
         </div>
     );
 };
