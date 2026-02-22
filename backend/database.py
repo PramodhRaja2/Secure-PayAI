@@ -14,9 +14,11 @@ if DATABASE_URL:
     # Connect to Cloud Postgres
     engine = create_engine(DATABASE_URL)
 else:
-    # Fallback to persistent disk on Render if available, otherwise local SQLite
-    if os.path.exists("/app/data"):
-        DATABASE_URL = "sqlite:////app/data/securepay.db"
+    # Use absolute path to the persistent mount on Render
+    # Default to local if mount point doesn't exist
+    mount_path = "/app/data"
+    if os.path.exists(mount_path):
+        DATABASE_URL = f"sqlite:///{mount_path}/securepay.db"
     else:
         DATABASE_URL = "sqlite:///./securepay.db"
     

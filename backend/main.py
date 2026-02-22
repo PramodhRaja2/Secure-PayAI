@@ -52,19 +52,17 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173", 
-        "http://127.0.0.1:5173", 
-        "http://localhost:5174", 
-        "http://127.0.0.1:5174", 
-        "https://secure-pay-ai.vercel.app",
-        "https://securepayai.vercel.app",
-        "https://secure-payai.vercel.app"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def startup_event():
+    print("Initializing Database...")
+    init_db()
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -840,7 +838,5 @@ async def advisor_chat(req: AdvisorRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    print("Initializing Database...")
-    init_db()
     print("Starting Server...")
     uvicorn.run(app, host="0.0.0.0", port=8001)
