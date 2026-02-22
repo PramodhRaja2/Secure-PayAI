@@ -14,7 +14,14 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
         source: null,
         dest: null,
         pathProgress: 0,
-        pulseRadius: 0
+        pulseRadius: 0,
+        // Interaction state
+        isDragging: false,
+        dragStart: null,
+        rotationStart: null,
+        scale: 1,
+        lastInteraction: 0, // timestamp of last user interaction
+        idleTimeout: 3000,  // ms before auto-spin resumes
     });
 
     // Sync props to ref
@@ -42,17 +49,67 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
         let frameId;
         let lastTime = performance.now();
 
+        // ──── MOUSE / TOUCH INTERACTION ────
+        const svgNode = svgRef.current;
+        if (!svgNode) return;
+
+        const onPointerDown = (e) => {
+            const s = stateRef.current;
+            s.isDragging = true;
+            s.dragStart = { x: e.clientX, y: e.clientY };
+            s.rotationStart = [...s.rotation];
+            s.lastInteraction = performance.now();
+            svgNode.style.cursor = 'grabbing';
+        };
+
+        const onPointerMove = (e) => {
+            const s = stateRef.current;
+            if (!s.isDragging || !s.dragStart) return;
+            const dx = e.clientX - s.dragStart.x;
+            const dy = e.clientY - s.dragStart.y;
+            // Sensitivity: ~0.3 degrees per pixel
+            s.rotation[0] = s.rotationStart[0] + dx * 0.3;
+            s.rotation[1] = s.rotationStart[1] - dy * 0.3;
+            // Clamp latitude
+            s.rotation[1] = Math.max(-90, Math.min(90, s.rotation[1]));
+            s.lastInteraction = performance.now();
+        };
+
+        const onPointerUp = () => {
+            const s = stateRef.current;
+            s.isDragging = false;
+            s.dragStart = null;
+            s.rotationStart = null;
+            s.lastInteraction = performance.now();
+            svgNode.style.cursor = 'grab';
+        };
+
+        const onWheel = (e) => {
+            e.preventDefault();
+            const s = stateRef.current;
+            const zoomDelta = e.deltaY > 0 ? -0.08 : 0.08;
+            s.scale = Math.max(0.5, Math.min(4, s.scale + zoomDelta));
+            s.lastInteraction = performance.now();
+        };
+
+        svgNode.addEventListener('pointerdown', onPointerDown);
+        svgNode.addEventListener('pointermove', onPointerMove);
+        svgNode.addEventListener('pointerup', onPointerUp);
+        svgNode.addEventListener('pointerleave', onPointerUp);
+        svgNode.addEventListener('wheel', onWheel, { passive: false });
+        svgNode.style.cursor = 'grab';
+        svgNode.style.touchAction = 'none'; // prevent scroll on touch devices
+
         const startLoop = () => {
             const svg = d3.select(svgRef.current);
             if (svg.empty()) return;
 
             const width = containerRef.current?.clientWidth || 800;
             const height = containerRef.current?.clientHeight || 800;
-            const radius = Math.min(width, height) / 2.2;
+            const baseRadius = Math.min(width, height) / 2.2;
 
             const projection = d3.geoOrthographic()
                 .translate([width / 2, height / 2])
-                .scale(radius)
                 .clipAngle(90);
 
             const path = d3.geoPath(projection);
@@ -60,6 +117,7 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
 
             // SVG Selections
             const globeOcean = svg.select(".globe-ocean");
+            const globeOceanShadow = svg.select(".globe-ocean-shadow");
             const globeLand = svg.select(".globe-land");
             const globeBorders = svg.select(".globe-borders");
             const routeLine = svg.select(".route-line");
@@ -70,14 +128,20 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
                 lastTime = time;
 
                 const s = stateRef.current;
+                const isIdle = !s.isDragging && (time - s.lastInteraction > s.idleTimeout);
 
-                if (!s.routingActive) {
-                    // Auto rotate
-                    s.rotation[0] += speed * (dt / 16);
-                    projection.rotate(s.rotation);
-                } else {
-                    // Target fixed midpoint rotation
-                    if (s.source && s.dest) {
+                // Apply zoom
+                projection.scale(baseRadius * s.scale);
+
+                // Update shadow circle size for zoom
+                globeOceanShadow
+                    .attr("cx", width / 2)
+                    .attr("cy", height / 2)
+                    .attr("r", baseRadius * s.scale + 4);
+
+                if (!s.isDragging) {
+                    if (s.routingActive && s.source && s.dest) {
+                        // When routing, smoothly orient to the midpoint
                         const interpolate = d3.geoInterpolate(
                             [Number(s.source.lng), Number(s.source.lat)],
                             [Number(s.dest.lng), Number(s.dest.lat)]
@@ -85,19 +149,21 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
                         const mid = interpolate(0.5);
                         const target = [-mid[0], -mid[1], 0];
 
-                        // Smoothly ease towards target
                         s.rotation[0] += (target[0] - s.rotation[0]) * 0.05;
                         s.rotation[1] += (target[1] - s.rotation[1]) * 0.05;
-                        projection.rotate(s.rotation);
 
                         // Animate path progress
                         if (s.pathProgress < 1) {
                             s.pathProgress += 0.015 * (dt / 16);
                             if (s.pathProgress > 1) s.pathProgress = 1;
                         }
+                    } else if (isIdle) {
+                        // Auto-spin when completely idle
+                        s.rotation[0] += speed * (dt / 16);
                     }
                 }
 
+                projection.rotate(s.rotation);
                 s.pulseRadius = (s.pulseRadius + 0.5 * (dt / 16)) % 20;
 
                 // Draw Base Map
@@ -121,7 +187,6 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
                     routeLine.attr("d", d);
 
                     if (d) {
-                        // Dasharray trick for drawing animation
                         const length = routeLine.node()?.getTotalLength() || 0;
                         routeLine
                             .attr("stroke-dasharray", length)
@@ -179,11 +244,16 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
 
         return () => {
             if (frameId) cancelAnimationFrame(frameId);
+            svgNode.removeEventListener('pointerdown', onPointerDown);
+            svgNode.removeEventListener('pointermove', onPointerMove);
+            svgNode.removeEventListener('pointerup', onPointerUp);
+            svgNode.removeEventListener('pointerleave', onPointerUp);
+            svgNode.removeEventListener('wheel', onWheel);
         };
     }, [cities, globeColor, speed]);
 
     return (
-        <div ref={containerRef} className="w-full h-full cursor-crosshair">
+        <div ref={containerRef} className="w-full h-full">
             <svg ref={svgRef} className="w-full h-full drop-shadow-2xl">
                 <defs>
                     <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
@@ -196,11 +266,11 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
                     </radialGradient>
                 </defs>
 
-                {/* Ocean Background */}
+                {/* Ocean Shadow */}
                 <circle className="globe-ocean-shadow" fill="#e2e8f0" />
                 <path className="globe-ocean" fill="url(#oceanGradient)" />
 
-                {/* Graticule / Wireframe feeling */}
+                {/* Land & Borders */}
                 <path className="globe-land" fill="#e2e8f0" stroke="#cbd5e1" strokeWidth={0.5} />
                 <path className="globe-borders" fill="none" stroke="#94a3b8" strokeWidth={0.5} />
 
