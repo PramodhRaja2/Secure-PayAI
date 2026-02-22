@@ -639,7 +639,10 @@ async def get_history(request: Request):
             "time": t.time,
             "amount": t.amount,
             "approved": t.approved,
-            "risk_score": t.risk_score
+            "risk_score": t.risk_score,
+            "base_currency": t.base_currency,
+            "target_currency": t.target_currency,
+            "status": t.status
         } for t in txns
     ]
 
