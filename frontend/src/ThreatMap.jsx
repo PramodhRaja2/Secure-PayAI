@@ -221,7 +221,7 @@ const ThreatMap = ({ transactions, optimizerRoute, miniMode, userRole, token }) 
             </div>
 
             {/* D3 Interactive Globe */}
-            <div className="absolute inset-0 z-0">
+            <div className="absolute inset-0 z-0 pointer-events-auto">
                 <InteractiveGlobe
                     cities={GLOBAL_CITIES}
                     source={source}

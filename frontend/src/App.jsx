@@ -767,8 +767,11 @@ const App = () => {
                     <div className="login-header">
                         <Activity color="#4f7df9" size={40} className="mx-auto" />
                         <h2>{isRegistering ? 'Create Profile' : 'SecurePay AI v4.0'}</h2>
-                        <div className="text-[10px] font-bold text-slate-400 -mt-1 uppercase tracking-tighter">Created By Pramodh R</div>
-                        <p>{isRegistering ? 'Enroll in the Governance Portal' : 'Identity & Risk Governance Portal'}</p>
+                        <div className="text-lg font-black text-blue-500 my-2 uppercase tracking-tighter">Built By Pramodh Raja</div>
+                        <p className="text-[10px] opacity-70 mb-4">{isRegistering ? 'Enterprise Identity Enrollment' : 'Identity & Specialized Governance Portal'}</p>
+                        <div className="text-[9px] font-bold text-slate-400 bg-slate-50 py-2 px-3 rounded-lg border border-slate-100 mb-4">
+                            Developed at <a href="https://www.bapssathy.ac.in/index.php" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Bannari Amman Public School</a>
+                        </div>
                     </div>
                     <form onSubmit={isRegistering ? handleRegister : handleLogin} className="login-form">
                         <div className="input-group">
@@ -818,7 +821,7 @@ const App = () => {
                 <div className="sidebar-logo">
                     <div className="logo-icon"><Shield size={20} /></div>
                     <h1>SecurePay AI</h1>
-                    <div className="text-[8px] font-bold text-slate-400 absolute top-[44px] left-[68px] uppercase tracking-tighter">Created By Pramodh R</div>
+                    <div className="text-[11px] font-black text-blue-600 absolute top-[44px] left-[68px] uppercase tracking-widest">Pramodh Raja</div>
                 </div>
 
                 <div className="px-6 py-4 mb-4">
@@ -853,13 +856,22 @@ const App = () => {
                             })}
                         </React.Fragment>
                     ))}
-                    <div className="mt-auto px-6 py-8 border-t border-[var(--border)]">
+                    <div className="mt-auto px-6 py-8 border-t border-[var(--border)] bg-slate-50/50">
                         <div className="mb-4">
-                            <div className="text-[10px] uppercase opacity-40 font-bold mb-2 tracking-widest">Architect</div>
-                            <div className="text-sm font-bold bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text text-transparent">Pramodh Raja(XI-B)</div>
+                            <div className="text-[9px] uppercase opacity-40 font-black mb-2 tracking-[0.2em]">Project Architect</div>
+                            <div className="text-sm font-black text-slate-900 mb-1">Pramodh Raja</div>
+                            <div className="text-[10px] font-bold text-blue-600 mb-3 leading-tight">
+                                <a href="https://www.bapssathy.ac.in/index.php" target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                    Bannari Amman Public School
+                                </a>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="text-[8px] font-black text-white bg-slate-900 px-2 py-1 rounded-sm uppercase text-center">Grade XI-B</div>
+                                <div className="text-[8px] font-black text-white bg-blue-600 px-2 py-1 rounded-sm uppercase text-center">Senior Lead</div>
+                            </div>
                         </div>
-                        <button className="flex items-center gap-2 text-xs opacity-40 hover:opacity-100 transition-all text-red-500" onClick={handleLogout}>
-                            <X size={14} /> System Logout
+                        <button className="flex items-center gap-2 text-[10px] font-black opacity-40 hover:opacity-100 transition-all text-red-600 uppercase tracking-widest" onClick={handleLogout}>
+                            <X size={12} strokeWidth={3} /> Shutdown Session
                         </button>
                     </div>
                 </nav>
@@ -1383,6 +1395,28 @@ const UserManagement = ({ token, user }) => {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <div className="bg-slate-900 border-t border-blue-500/10 p-6 flex justify-between items-center mt-auto">
+                    <div className="flex items-center gap-6">
+                        <div>
+                            <div className="text-[9px] uppercase opacity-40 font-black text-white tracking-[0.2em] mb-1">Architect</div>
+                            <div className="text-sm font-black text-blue-400 uppercase tracking-widest leading-none">Pramodh Raja</div>
+                        </div>
+                        <div className="h-8 w-[1px] bg-white/10"></div>
+                        <div>
+                            <div className="text-[9px] uppercase opacity-40 font-black text-white tracking-[0.2em] mb-1">Institution</div>
+                            <div className="text-xs font-bold text-white/70">
+                                <a href="https://www.bapssathy.ac.in/index.php" target="_blank" rel="noopener noreferrer" className="hover:text-blue-500 underline decoration-blue-500/30 underline-offset-4 transition-all">
+                                    Bannari Amman Public School
+                                </a>
+                            </div>
+                        </div>
+                        <div className="h-8 w-[1px] bg-white/10"></div>
+                        <div className="bg-blue-600/20 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-sm">
+                            <div className="text-[10px] font-black uppercase tracking-widest text-center">Grade XI-B</div>
+                        </div>
                     </div>
                 </div>
             </div>

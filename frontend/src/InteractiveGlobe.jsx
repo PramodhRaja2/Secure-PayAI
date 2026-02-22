@@ -26,13 +26,15 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
 
     // Sync props to ref
     useEffect(() => {
+        // Reset animation progress if routing starts or if the cities change
+        if (!isRouting || stateRef.current.source?.id !== source?.id || stateRef.current.dest?.id !== dest?.id) {
+            stateRef.current.pathProgress = 0;
+        }
+
         stateRef.current.routingActive = isRouting;
         stateRef.current.source = source;
         stateRef.current.dest = dest;
         stateRef.current.locked = locked;
-        if (!isRouting) {
-            stateRef.current.pathProgress = 0;
-        }
     }, [isRouting, source, dest, locked]);
 
     useEffect(() => {
