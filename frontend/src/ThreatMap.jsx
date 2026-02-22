@@ -14,6 +14,7 @@ const ThreatMap = ({ transactions, optimizerRoute, miniMode }) => {
     const [simSourceId, setSimSourceId] = useState('NYC');
     const [simDestId, setSimDestId] = useState('LDN');
     const [simRisk, setSimRisk] = useState(15);
+    const [locked, setLocked] = useState(true);
 
     useEffect(() => {
         if (transactions && transactions.length > 0) {
@@ -143,12 +144,18 @@ const ThreatMap = ({ transactions, optimizerRoute, miniMode }) => {
                 )}
             </div>
 
-            <div className="absolute bottom-4 right-4 z-10 pointer-events-none flex flex-col gap-1 items-end drop-shadow-sm">
-                <div className="flex items-center gap-2 text-[9px] font-bold uppercase text-emerald-600 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-emerald-100">
+            <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1 items-end drop-shadow-sm">
+                <button
+                    onClick={() => setLocked(!locked)}
+                    className={`pointer-events-auto flex items-center gap-2 text-[9px] font-bold uppercase px-3 py-1.5 rounded-full border transition-all cursor-pointer mb-1 ${locked ? 'bg-blue-600 text-white border-blue-500' : 'bg-white/80 backdrop-blur text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                >
+                    {locked ? '🔒 Locked to Route' : '🌐 Free Explore'}
+                </button>
+                <div className="pointer-events-none flex items-center gap-2 text-[9px] font-bold uppercase text-emerald-600 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-emerald-100">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     Clean Routing
                 </div>
-                <div className="flex items-center gap-2 text-[9px] font-bold uppercase text-red-600 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-red-100">
+                <div className="pointer-events-none flex items-center gap-2 text-[9px] font-bold uppercase text-red-600 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-red-100">
                     <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
                     Threat Intercepted
                 </div>
@@ -163,6 +170,7 @@ const ThreatMap = ({ transactions, optimizerRoute, miniMode }) => {
                     isRouting={isRouting}
                     globeColor={globeColor}
                     speed={1}
+                    locked={locked}
                 />
             </div>
         </div>

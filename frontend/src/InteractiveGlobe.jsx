@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import * as d3 from 'd3';
 import * as topojson from 'topojson-client';
 
-export default function InteractiveGlobe({ cities, source, dest, isRouting, globeColor, speed }) {
+export default function InteractiveGlobe({ cities, source, dest, isRouting, globeColor, speed, locked }) {
     const containerRef = useRef(null);
     const svgRef = useRef(null);
     const dataRef = useRef(null);
@@ -29,10 +29,11 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
         stateRef.current.routingActive = isRouting;
         stateRef.current.source = source;
         stateRef.current.dest = dest;
+        stateRef.current.locked = locked;
         if (!isRouting) {
             stateRef.current.pathProgress = 0;
         }
-    }, [isRouting, source, dest]);
+    }, [isRouting, source, dest, locked]);
 
     useEffect(() => {
         // Load map data once
@@ -140,8 +141,8 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
                     .attr("r", baseRadius * s.scale + 4);
 
                 if (!s.isDragging) {
-                    if (s.routingActive && s.source && s.dest) {
-                        // When routing, smoothly orient to the midpoint
+                    if (s.locked && s.routingActive && s.source && s.dest) {
+                        // LOCKED: smoothly orient to the route midpoint
                         const interpolate = d3.geoInterpolate(
                             [Number(s.source.lng), Number(s.source.lat)],
                             [Number(s.dest.lng), Number(s.dest.lat)]
@@ -158,8 +159,14 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
                             if (s.pathProgress > 1) s.pathProgress = 1;
                         }
                     } else if (isIdle) {
-                        // Auto-spin when completely idle
+                        // FREE or no route: auto-spin when idle
                         s.rotation[0] += speed * (dt / 16);
+                    }
+
+                    // Always animate path progress even if unlocked
+                    if (!s.locked && s.routingActive && s.pathProgress < 1) {
+                        s.pathProgress += 0.015 * (dt / 16);
+                        if (s.pathProgress > 1) s.pathProgress = 1;
                     }
                 }
 
