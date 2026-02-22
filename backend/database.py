@@ -14,8 +14,12 @@ if DATABASE_URL:
     # Connect to Cloud Postgres
     engine = create_engine(DATABASE_URL)
 else:
-    # Fallback to local SQLite if no environment variable is set
-    DATABASE_URL = "sqlite:///./securepay.db"
+    # Fallback to persistent disk on Render if available, otherwise local SQLite
+    if os.path.exists("/app/data"):
+        DATABASE_URL = "sqlite:////app/data/securepay.db"
+    else:
+        DATABASE_URL = "sqlite:///./securepay.db"
+    
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(bind=engine)
