@@ -23,7 +23,10 @@ const ThreatMap = ({ transactions, optimizerRoute, miniMode, userRole, token }) 
         try {
             const resp = await fetch('https://secure-payai.onrender.com/admin/clear-ledger', {
                 method: 'DELETE',
-                headers: { 'Authorization': token }
+                headers: {
+                    'Authorization': token,
+                    'Bypass-Tunnel-Reminder': 'true'
+                }
             });
             const data = await resp.json();
             if (resp.ok) {
