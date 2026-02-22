@@ -14,6 +14,9 @@ import {
     Loader, Download, ArrowRight, Trash, Trash2
 } from 'lucide-react';
 
+import AIAdvisor from './AIAdvisor';
+import ThreatMap from './ThreatMap';
+
 const API = axios.create({
     baseURL: 'https://secure-payai.onrender.com',
     headers: { 'Bypass-Tunnel-Reminder': 'true' }
@@ -701,13 +704,15 @@ const App = () => {
             case 'admin_stats': return <AdminStats token={token} />;
             case 'users': return <UserManagement token={token} user={user} />;
             case 'alerts': return <AlertList token={token} user={user} messages={messages} setMessages={setMessages} />;
+            case 'advisor': return <AIAdvisor user={user} token={token} />;
+            case 'threatmap': return <div className="h-[650px] animate-in-up"><ThreatMap transactions={history} /></div>;
             default: return renderOptimizer();
         }
     };
 
     const navSections = [
         { title: 'Engines', items: [{ id: 'optimizer', icon: <Cpu size={16} />, label: 'Optimizer' }, { id: 'risk', icon: <ShieldCheck size={16} />, label: 'Security' }, { id: 'rates', icon: <TrendingUp size={16} />, label: 'FX Intel' }] },
-        { title: 'Analytics', items: [{ id: 'providers', icon: <BarChart3 size={16} />, label: 'Banks Directory' }, { id: 'corridors', icon: <Layers size={16} />, label: 'Protocols' }, { id: 'aml', icon: <FileWarning size={16} />, label: 'Compliance' }] },
+        { title: 'Analytics', items: [{ id: 'threatmap', icon: <Globe size={16} />, label: 'Live Threat Map' }, { id: 'providers', icon: <BarChart3 size={16} />, label: 'Banks Directory' }, { id: 'corridors', icon: <Layers size={16} />, label: 'Protocols' }, { id: 'aml', icon: <FileWarning size={16} />, label: 'Compliance' }] },
         {
             title: 'Governance', items: [
                 { id: 'admin_stats', icon: <Activity size={16} />, label: 'Admin Insight', adminOnly: true },
@@ -715,7 +720,7 @@ const App = () => {
                 { id: 'alerts', icon: <Zap size={16} />, label: 'Inbox & Broadcasts' }
             ]
         },
-        { title: 'Audit Log', items: [{ id: 'history', icon: <History size={16} />, label: 'Audit Ledger' }, { id: 'bioprofile', icon: <Eye size={16} />, label: 'Identity' }, { id: 'security', icon: <Settings size={16} />, label: 'Policy' }] },
+        { title: 'Audit Log', items: [{ id: 'history', icon: <History size={16} />, label: 'Audit Ledger' }, { id: 'bioprofile', icon: <Eye size={16} />, label: 'Identity' }, { id: 'security', icon: <Settings size={16} />, label: 'Policy' }, { id: 'advisor', icon: <Zap size={16} />, label: 'AI Advisor' }] },
     ];
     const handleNav = (id) => {
         setActiveNav(id);

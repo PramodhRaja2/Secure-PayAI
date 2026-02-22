@@ -1,3 +1,11 @@
+import os
+from dotenv import load_dotenv
+import google.generativeai as genai
+
+load_dotenv()
+if os.getenv("GEMINI_API_KEY"):
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
 from fastapi import FastAPI, HTTPException, Request, Header
 from pydantic import BaseModel
 from typing import Optional, List, Dict
@@ -105,6 +113,10 @@ class TransactionRequest(BaseModel):
     session_hour: Optional[int] = 12
     is_copy_paste: Optional[bool] = False
     is_vpn: Optional[bool] = False
+
+class AdvisorRequest(BaseModel):
+    message: str
+    user_id: int
 
 @app.get("/")
 async def root():
@@ -755,6 +767,49 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
         "go_decision_note": risk_report["recommendation_detail"],
         "fusion_version": "4.0.0"
     }
+
+@app.post("/advisor/chat")
+async def advisor_chat(req: AdvisorRequest):
+    # Retrieve user context
+    db = SessionLocal()
+    user = db.query(UserProfile).filter(UserProfile.id == req.user_id).first()
+    if not user:
+        db.close()
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    recent_txns = db.query(Transaction).filter(Transaction.user_id == user.id).order_by(Transaction.time.desc()).limit(5).all()
+    txns_str = "\n".join([f"- ID: {t.id} | {t.amount} {t.base_currency} -> {t.target_currency} | Status: {t.status} | Risk Score: {t.risk_score}" for t in recent_txns])
+    
+    db.close()
+    
+    if not os.getenv("GEMINI_API_KEY"):
+         raise HTTPException(status_code=500, detail="LLM AI is currently disabled (No API Key).")
+         
+    # Build a context-rich prompt
+    system_prompt = f"""
+    You are the 'SecurePay AI Financial Advisor', an expert, highly professional, and slightly futuristic AI embedded within a high-security banking terminal.
+    Your goal is to assist the user with their financial security queries and explain risk logic. Be concise, direct, and helpful. Do not use markdown that would break a simple text chat.
+    
+    USER CONTEXT:
+    Username: {user.username}
+    Role: {user.role}
+    Primary Location: {user.primary_location}
+    Risk Preference: {user.preferred_priority}
+    
+    RECENT TRANSACTIONS:
+    {txns_str if txns_str else "None"}
+    
+    USER QUERY:
+    {req.message}
+    """
+    
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(system_prompt)
+        return {"response": response.text}
+    except Exception as e:
+        print(f"Gemini Error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI Advisor encountered a neural disconnect: {e}")
 
 if __name__ == "__main__":
     import uvicorn
