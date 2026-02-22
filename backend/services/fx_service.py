@@ -6,7 +6,7 @@ from datetime import datetime
 # ─── Rate Cache with 6-hour TTL ───
 _rate_cache = {}
 _cache_lock = threading.Lock()
-CACHE_TTL_SECONDS = 6 * 60 * 60  # 6 hours
+CACHE_TTL_SECONDS = 2 * 60  # 2 minutes
 
 BASE_URL = "https://open.er-api.com/v6/latest/"
 

@@ -431,6 +431,45 @@ async def logout(request: Request):
 async def get_currencies():
     return SUPPORTED_CURRENCIES
 
+@app.delete("/alerts/{alert_id}")
+async def delete_alert(alert_id: int, authorization: str = Header(None)):
+    db = SessionLocal()
+    requester = None
+    if authorization and authorization in sessions:
+        req_username = sessions[authorization]
+        requester = db.query(UserProfile).filter(UserProfile.username == req_username).first()
+    
+    if not requester:
+        db.close()
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    alert = db.query(Alert).filter(Alert.id == alert_id).first()
+    if not alert:
+        db.close()
+        raise HTTPException(status_code=404, detail="Alert not found")
+        
+    # Permission Logic:
+    # 1. Dev (Pramodhraja) can delete anything.
+    # 2. If it's a DEVOPS message, only Dev can delete it.
+    # 3. Otherwise, the recipient or an admin can delete it.
+    
+    can_delete = False
+    if requester.role == "dev":
+        can_delete = True
+    elif alert.from_username == "DEVOPS":
+        can_delete = False # Only dev checked above can delete DEVOPS messages
+    elif alert.user_id == requester.id or requester.role == "admin":
+        can_delete = True
+        
+    if not can_delete:
+        db.close()
+        raise HTTPException(status_code=403, detail="Permission denied to delete this message")
+        
+    db.delete(alert)
+    db.commit()
+    db.close()
+    return {"status": "success"}
+
 @app.get("/transaction-history")
 async def get_history(request: Request):
     db = SessionLocal()

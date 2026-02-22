@@ -11,7 +11,7 @@ import {
     Building, BarChart3, ShieldCheck, FileWarning, Lock,
     Eye, Layers, Send, Cpu, History, Settings,
     Keyboard, MousePointer, Smartphone, Info, Menu, X,
-    Loader, Download, ArrowRight
+    Loader, Download, ArrowRight, Trash, Trash2
 } from 'lucide-react';
 
 const API = axios.create({
@@ -337,10 +337,27 @@ const DevConsole = ({ user, token, onLogout }) => {
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                     {devMessages.map(m => (
-                                        <div key={m.id} style={{ background: '#0f172a', borderLeft: '2px solid #3b82f6', padding: '16px', borderRadius: '0 8px 8px 0' }}>
+                                        <div key={m.id} style={{ background: '#0f172a', borderLeft: '2px solid #3b82f6', padding: '16px', borderRadius: '0 8px 8px 0', position: 'relative' }} className="group">
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                                 <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd' }}>{m.from_username || 'SYSTEM'}</div>
-                                                <div style={{ fontSize: 9, color: '#64748b' }}>{new Date(m.time).toLocaleString()}</div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <div style={{ fontSize: 9, color: '#64748b' }}>{new Date(m.time).toLocaleString()}</div>
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm("Purge this transmission from local registry?")) {
+                                                                API.delete(`/alerts/${m.id}`, { headers: { Authorization: token } })
+                                                                    .then(() => setDevMessages(prev => prev.filter(x => x.id !== m.id)))
+                                                                    .catch(e => alert(e.response?.data?.detail || "Purge failed"));
+                                                            }
+                                                        }}
+                                                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, opacity: 0.3, transition: 'opacity 0.2s' }}
+                                                        onMouseOver={e => e.currentTarget.style.opacity = '1'}
+                                                        onMouseOut={e => e.currentTarget.style.opacity = '0.3'}
+                                                        title="Purge Message"
+                                                    >
+                                                        <Trash2 size={10} />
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div style={{ fontSize: 12, color: '#e2e8f0', lineHeight: 1.5 }}>{m.message}</div>
                                         </div>
@@ -545,6 +562,16 @@ const App = () => {
             setApiError(e.response?.data?.detail || e.message || 'Analysis failed. API gateway unreachable.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteAlert = async (id, callback) => {
+        if (!window.confirm("Delete this message permanently?")) return;
+        try {
+            await API.delete(`/alerts/${id}`, { headers: { Authorization: token } });
+            if (callback) callback();
+        } catch (e) {
+            alert(e.response?.data?.detail || "Delete failed");
         }
     };
 
@@ -1219,15 +1246,36 @@ const AlertList = ({ token, user }) => {
                         <div className="text-center py-12 opacity-30"><Shield size={40} className="mx-auto mb-4" />No active messages or broadcasts.</div>
                     ) : (
                         <div className="space-y-4">
-                            {alerts.map(a => (
-                                <div key={a.id} className={`p-4 rounded-2xl border ${a.type === 'threat' ? 'bg-red-500/10 border-red-500/20' : 'bg-blue-500/10 border-blue-500/20'}`}>
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className={`text-[10px] font-bold uppercase ${a.type === 'threat' ? 'text-red-400' : 'text-blue-400'}`}>{a.type === 'threat' ? '⚠️ Security Alert' : '📩 Admin Message'}</div>
-                                        <div className="text-[10px] opacity-40">{new Date(a.time).toLocaleString()}</div>
+                            {alerts.map(a => {
+                                const isDevOps = a.from_username === 'DEVOPS';
+                                const canDelete = user.role === 'dev' || !isDevOps;
+                                return (
+                                    <div key={a.id} className={`p-4 rounded-2xl border ${a.type === 'threat' ? 'bg-red-500/10 border-red-500/20' : 'bg-blue-500/10 border-blue-500/20'}`}>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className={`text-[10px] font-bold uppercase ${a.type === 'threat' ? 'text-red-400' : 'text-blue-400'}`}>{a.type === 'threat' ? '⚠️ Security Alert' : '📩 Admin Message'}</div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-[10px] opacity-40">{new Date(a.time).toLocaleString()}</div>
+                                                {canDelete && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm("Delete this alert?")) {
+                                                                API.delete(`/alerts/${a.id}`, { headers: { Authorization: token } })
+                                                                    .then(() => setAlerts(prev => prev.filter(x => x.id !== a.id)))
+                                                                    .catch(e => alert(e.response?.data?.detail || "Delete failed"));
+                                                            }
+                                                        }}
+                                                        className="opacity-20 hover:opacity-100 hover:text-red-500 transition-all"
+                                                        title="Delete Alert"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <p className="text-sm opacity-80">{a.message}</p>
                                     </div>
-                                    <p className="text-sm opacity-80">{a.message}</p>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -1286,7 +1334,7 @@ const AdminMessages = ({ token }) => {
                 ) : (
                     <div className="space-y-4">
                         {messages.map(m => (
-                            <div key={m.id} className="p-4 bg-[var(--bg-primary)] border border-[var(--border)] rounded-2xl">
+                            <div key={m.id} className="p-4 bg-[var(--bg-primary)] border border-[var(--border)] rounded-2xl group relative">
                                 <div className="flex justify-between items-center mb-2">
                                     <div className="flex items-center gap-2">
                                         <div className="w-7 h-7 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center font-bold text-xs">
@@ -1294,7 +1342,22 @@ const AdminMessages = ({ token }) => {
                                         </div>
                                         <span className="text-xs font-bold">{m.from_username || 'Unknown User'}</span>
                                     </div>
-                                    <div className="text-[10px] opacity-40">{new Date(m.time).toLocaleString()}</div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="text-[10px] opacity-40">{new Date(m.time).toLocaleString()}</div>
+                                        <button
+                                            onClick={() => {
+                                                if (window.confirm("Delete this user message?")) {
+                                                    API.delete(`/alerts/${m.id}`, { headers: { Authorization: token } })
+                                                        .then(() => setMessages(prev => prev.filter(x => x.id !== m.id)))
+                                                        .catch(e => alert(e.response?.data?.detail || "Delete failed"));
+                                                }
+                                            }}
+                                            className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all"
+                                            title="Delete Message"
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </div>
                                 </div>
                                 <p className="text-sm opacity-80 leading-relaxed pl-9">{m.message}</p>
                             </div>
