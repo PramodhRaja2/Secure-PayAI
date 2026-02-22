@@ -2,7 +2,13 @@ import React, { useState, useEffect } from 'react';
 import InteractiveGlobe from './InteractiveGlobe';
 import { GLOBAL_CITIES } from './citiesData';
 
-const ThreatMap = ({ transactions }) => {
+// Map currency codes to their main financial hub city IDs
+const CURRENCY_TO_CITY = {
+    'USD': 'NYC', 'EUR': 'FRA', 'GBP': 'LDN', 'INR': 'MUM',
+    'JPY': 'TOK', 'AED': 'DXB', 'NGN': 'LOS'
+};
+
+const ThreatMap = ({ transactions, optimizerRoute, miniMode }) => {
     const [latest, setLatest] = useState(null);
     const [simMode, setSimMode] = useState(false);
     const [simSourceId, setSimSourceId] = useState('NYC');
@@ -20,20 +26,48 @@ const ThreatMap = ({ transactions }) => {
     let isRouting = false;
     let globeColor = '#10b981';
 
-    if (simMode) {
+    // Priority: 1. Simulator Mode  2. Optimizer Route  3. Live Feed
+    if (simMode && !miniMode) {
         source = GLOBAL_CITIES.find(c => c.id === simSourceId) || GLOBAL_CITIES[0];
         dest = GLOBAL_CITIES.find(c => c.id === simDestId) || GLOBAL_CITIES[1];
         isRouting = true;
         const isThreat = simRisk > 60;
         globeColor = isThreat ? '#ef4444' : '#10b981';
+    } else if (optimizerRoute && optimizerRoute.source_city && optimizerRoute.dest_city) {
+        source = GLOBAL_CITIES.find(c => c.id === optimizerRoute.source_city) || GLOBAL_CITIES[0];
+        dest = GLOBAL_CITIES.find(c => c.id === optimizerRoute.dest_city) || GLOBAL_CITIES[1];
+        isRouting = true;
+        globeColor = '#3b82f6'; // Blue for optimizer preview
     } else if (latest) {
-        // Fallback to finding nearest matching city for legacy data, or use defaults
-        source = GLOBAL_CITIES.find(c => c.id === latest.base_currency) || GLOBAL_CITIES.find(c => c.country.includes('USA'));
-        dest = GLOBAL_CITIES.find(c => c.id === latest.target_currency) || GLOBAL_CITIES.find(c => c.country.includes('UK'));
-
+        source = GLOBAL_CITIES.find(c => c.id === CURRENCY_TO_CITY[latest.base_currency]) || GLOBAL_CITIES.find(c => c.country.includes('USA'));
+        dest = GLOBAL_CITIES.find(c => c.id === CURRENCY_TO_CITY[latest.target_currency]) || GLOBAL_CITIES.find(c => c.country.includes('UK'));
         isRouting = true;
         const isThreat = latest.risk_score > 60 || (latest.status && latest.status.includes('denied'));
-        globeColor = isThreat ? '#ef4444' : '#10b981'; // Red for threat, Emerald for safe
+        globeColor = isThreat ? '#ef4444' : '#10b981';
+    }
+
+    // Mini mode: render just the globe with no overlay UI
+    if (miniMode) {
+        return (
+            <div className="w-full h-full bg-slate-50 rounded-b-2xl overflow-hidden relative">
+                <div className="absolute top-3 left-3 z-10 pointer-events-none">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                        {source?.name || '—'} → {dest?.name || '—'}
+                    </div>
+                </div>
+                <div className="absolute inset-0">
+                    <InteractiveGlobe
+                        cities={GLOBAL_CITIES}
+                        source={source}
+                        dest={dest}
+                        isRouting={isRouting}
+                        globeColor={globeColor}
+                        speed={0.5}
+                    />
+                </div>
+            </div>
+        );
     }
 
     return (

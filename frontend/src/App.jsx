@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import AIAdvisor from './AIAdvisor';
+import { GLOBAL_CITIES } from './citiesData';
 import ThreatMap from './ThreatMap';
 
 const API = axios.create({
@@ -163,7 +164,7 @@ const CacheHealthIndicator = () => {
 
 /* ─────────── MAIN APP ─────────── */
 const App = () => {
-    const [txnData, setTxnData] = useState({ amount: 25000, base_currency: 'USD', target_currency: 'EUR', priority: 'balanced' });
+    const [txnData, setTxnData] = useState({ amount: 25000, base_currency: 'USD', target_currency: 'EUR', priority: 'balanced', source_city: 'NYC', dest_city: 'LDN' });
     const [currencies, setCurrencies] = useState([]);
     const [analysis, setAnalysis] = useState(null);
     const [history, setHistory] = useState([]);
@@ -352,6 +353,20 @@ const App = () => {
                                 </select>
                             </div>
                         </div>
+                        <div className="grid-2">
+                            <div className="form-group">
+                                <label className="form-label">Origin City</label>
+                                <select className="form-select" value={txnData.source_city} onChange={e => setTxnData({ ...txnData, source_city: e.target.value })}>
+                                    {GLOBAL_CITIES.map(c => <option key={`src-${c.id}`} value={c.id}>{c.name}, {c.country}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Destination City</label>
+                                <select className="form-select" value={txnData.dest_city} onChange={e => setTxnData({ ...txnData, dest_city: e.target.value })}>
+                                    {GLOBAL_CITIES.map(c => <option key={`dst-${c.id}`} value={c.id}>{c.name}, {c.country}</option>)}
+                                </select>
+                            </div>
+                        </div>
                         <div className="form-group">
                             <label className="form-label">Optimization Priority</label>
                             <div className="priority-tabs">
@@ -374,6 +389,8 @@ const App = () => {
                         <button className="btn-primary" onClick={handleAnalyze} disabled={loading}>{loading ? 'Optimizing Routes...' : 'Search Available Banks'}</button>
                     </div>
                 </div>
+
+
 
                 {analysis && (
                     <div className="card section-gap">
@@ -705,7 +722,7 @@ const App = () => {
             case 'users': return <UserManagement token={token} user={user} />;
             case 'alerts': return <AlertList token={token} user={user} messages={messages} setMessages={setMessages} />;
             case 'advisor': return <AIAdvisor user={user} token={token} />;
-            case 'threatmap': return <div className="h-[650px] animate-in-up"><ThreatMap transactions={history} /></div>;
+            case 'threatmap': return <div className="h-[650px] animate-in-up"><ThreatMap transactions={history} optimizerRoute={txnData} /></div>;
             default: return renderOptimizer();
         }
     };
