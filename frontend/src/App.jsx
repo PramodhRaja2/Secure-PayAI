@@ -787,7 +787,7 @@ const App = () => {
     }
 
     if (user.role === 'dev') {
-        return <DevConsole user={user} token={token} onLogout={handleLogout} />;
+        return <DevConsole user={user} token={token} onLogout={handleLogout} messages={messages} setMessages={setMessages} />;
     }
 
     return (
