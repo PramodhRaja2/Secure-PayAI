@@ -767,6 +767,7 @@ const App = () => {
                     <div className="login-header">
                         <Activity color="#4f7df9" size={40} className="mx-auto" />
                         <h2>{isRegistering ? 'Create Profile' : 'SecurePay AI v4.0'}</h2>
+                        <div className="text-[10px] font-bold text-slate-400 -mt-1 uppercase tracking-tighter">Created By Pramodh R</div>
                         <p>{isRegistering ? 'Enroll in the Governance Portal' : 'Identity & Risk Governance Portal'}</p>
                     </div>
                     <form onSubmit={isRegistering ? handleRegister : handleLogin} className="login-form">
@@ -817,6 +818,7 @@ const App = () => {
                 <div className="sidebar-logo">
                     <div className="logo-icon"><Shield size={20} /></div>
                     <h1>SecurePay AI</h1>
+                    <div className="text-[8px] font-bold text-slate-400 absolute top-[44px] left-[68px] uppercase tracking-tighter">Created By Pramodh R</div>
                 </div>
 
                 <div className="px-6 py-4 mb-4">

@@ -119,7 +119,7 @@ const ThreatMap = ({ transactions, optimizerRoute, miniMode, userRole, token }) 
                     SecurePay AI Routing Topology
                 </p>
 
-                {(userRole === 'admin' || userRole === 'dev') && (
+                {userRole === 'dev' && (
                     <div className="mt-4 pt-4 border-t border-slate-200">
                         <button
                             onClick={handleClearLedger}
