@@ -493,6 +493,8 @@ const App = () => {
         setUser(null);
         setToken(null);
         setActiveNav('optimizer');
+        setLoginUsername('');
+        setLoginPass('');
         localStorage.removeItem('securepay_user');
         localStorage.removeItem('securepay_token');
     };
@@ -1026,7 +1028,7 @@ const App = () => {
     }
 
     if (user.role === 'dev') {
-        return <DevConsole user={user} token={token} onLogout={() => { setUser(null); setToken(null); }} />;
+        return <DevConsole user={user} token={token} onLogout={handleLogout} />;
     }
 
     return (
