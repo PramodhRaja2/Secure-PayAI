@@ -79,6 +79,16 @@ class BiometricEngine:
                 "current": f"{speed} WPM",
                 "deviation": f"{int(dev*100)}% variance"
             })
+        else:
+            anomalies.append({
+                "factor": "Typing Dynamics",
+                "icon": "keyboard",
+                "status": "normal",
+                "risk_contribution": 0,
+                "baseline": f"{profile['typing_speed']} WPM",
+                "current": f"{speed} WPM",
+                "deviation": f"{int(dev*100)}% variance (Normal range)"
+            })
 
         # 2. Mouse Logic
         vel = current_metrics.get("mouse_velocity", 0)
@@ -92,6 +102,16 @@ class BiometricEngine:
                 "baseline": f"{profile['mouse_velocity']} px/s",
                 "current": f"{vel} px/s",
                 "deviation": "Unusual pathing (Bot-like)"
+            })
+        else:
+            anomalies.append({
+                "factor": "Motion Dynamics",
+                "icon": "mouse-pointer",
+                "status": "normal",
+                "risk_contribution": 0,
+                "baseline": f"{profile['mouse_velocity']} px/s",
+                "current": f"{vel} px/s",
+                "deviation": f"{int(m_dev*100)}% variance (Smooth)"
             })
 
         # 3. Location Logic (Impossible Travel)
@@ -119,6 +139,16 @@ class BiometricEngine:
                 "current": current_metrics.get("ip_location"),
                 "deviation": "Unusual access point"
             })
+        else:
+            anomalies.append({
+                "factor": "IP Geolocation",
+                "icon": "map-pin",
+                "status": "normal",
+                "risk_contribution": 0,
+                "baseline": profile["ip_location"],
+                "current": profile["ip_location"],
+                "deviation": "Verified known origin"
+            })
             
         # 4. VPN/Network Logic
         if current_metrics.get("is_vpn"):
@@ -130,6 +160,16 @@ class BiometricEngine:
                 "baseline": "Residential ISP",
                 "current": "VPN/Proxy Detected",
                 "deviation": "High-risk IP Reputation"
+            })
+        else:
+             anomalies.append({
+                "factor": "Network Legality",
+                "icon": "shield",
+                "status": "normal",
+                "risk_contribution": 0,
+                "baseline": "Residential ISP",
+                "current": "Residential ISP",
+                "deviation": "Clean IP Reputation"
             })
 
         # 5. Amount Logic (Whole Dollar/Rounded heuristic)
@@ -157,6 +197,17 @@ class BiometricEngine:
                 "current": f"${amt:,}",
                 "deviation": "High-value anomaly"
             })
+        else:
+            anomalies.append({
+                "factor": "Transaction Size",
+                "icon": "dollar-sign",
+                "status": "normal",
+                "risk_contribution": 0,
+                "baseline": f"${profile['transaction_amount']:,}",
+                "current": f"${amt:,}",
+                "deviation": "Standard baseline amount"
+            })
+
 
         # 6. Timing/Velocity Logic
         hour = current_metrics.get("session_hour", 12)
@@ -181,6 +232,16 @@ class BiometricEngine:
                 "baseline": "8AM-8PM",
                 "current": f"{hour}:00 UTC",
                 "deviation": "Off-peak access"
+            })
+        else:
+             anomalies.append({
+                "factor": "Session Timing",
+                "icon": "clock",
+                "status": "normal",
+                "risk_contribution": 0,
+                "baseline": "8AM-8PM",
+                "current": f"{hour}:00 UTC",
+                "deviation": "Peak access hours"
             })
 
         return anomalies
