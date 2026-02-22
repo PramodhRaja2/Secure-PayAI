@@ -722,7 +722,7 @@ const App = () => {
             case 'users': return <UserManagement token={token} user={user} />;
             case 'alerts': return <AlertList token={token} user={user} messages={messages} setMessages={setMessages} />;
             case 'advisor': return <AIAdvisor user={user} token={token} />;
-            case 'threatmap': return <div className="h-[650px] animate-in-up"><ThreatMap transactions={history} optimizerRoute={txnData} /></div>;
+            case 'threatmap': return <div className="h-[650px] animate-in-up"><ThreatMap transactions={history} optimizerRoute={txnData} userRole={user?.role} token={token} /></div>;
             default: return renderOptimizer();
         }
     };
@@ -1012,10 +1012,12 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
     const handleWipeData = async () => {
         if (!window.confirm("Are you absolutely sure you want to wipe ALL transactional and alert data? This action is irreversible.")) return;
         try {
-            await API.delete('/dev/wipe', { headers: { Authorization: token } });
+            await API.delete('/admin/clear-ledger', { headers: { Authorization: token } });
             alert("Data wipe initiated successfully.");
-            setStats(prev => ({ ...prev, total_transactions: 0, pending: 0 }));
+            if (typeof setStats === 'function') setStats(prev => ({ ...prev, total_transactions: 0, pending: 0 }));
             setPending([]);
+            setHistory([]);
+            setMessages([]);
         } catch (e) { alert(e.response?.data?.detail || "Data wipe failed"); }
     };
 

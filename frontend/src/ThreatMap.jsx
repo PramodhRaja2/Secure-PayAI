@@ -8,13 +8,33 @@ const CURRENCY_TO_CITY = {
     'JPY': 'TOK', 'AED': 'DXB', 'NGN': 'LOS'
 };
 
-const ThreatMap = ({ transactions, optimizerRoute, miniMode }) => {
+const ThreatMap = ({ transactions, optimizerRoute, miniMode, userRole, token }) => {
     const [latest, setLatest] = useState(null);
     const [simMode, setSimMode] = useState(false);
     const [simSourceId, setSimSourceId] = useState('NYC');
     const [simDestId, setSimDestId] = useState('LDN');
     const [simRisk, setSimRisk] = useState(15);
     const [locked, setLocked] = useState(true);
+    const [isClearing, setIsClearing] = useState(false);
+
+    const handleClearLedger = async () => {
+        if (!window.confirm("NUCLEAR PROTOCOL: This will PERMANENTLY WIPE the cloud ledger. Proceed?")) return;
+        setIsClearing(true);
+        try {
+            const resp = await fetch('https://secure-payai.onrender.com/admin/clear-ledger', {
+                method: 'DELETE',
+                headers: { 'Authorization': token }
+            });
+            const data = await resp.json();
+            if (resp.ok) {
+                alert(`Ledger Purged. Deleted ${data.deleted_transactions} transactions.`);
+                window.location.reload(); // Refresh to clear local state
+            } else {
+                alert(data.detail || "Purge failed");
+            }
+        } catch (e) { console.error(e); alert("Connection failed"); }
+        setIsClearing(false);
+    };
 
     useEffect(() => {
         if (transactions && transactions.length > 0) {
@@ -95,6 +115,18 @@ const ThreatMap = ({ transactions, optimizerRoute, miniMode }) => {
                 <p className="text-[10px] text-slate-500 font-mono mt-1 font-bold">
                     SecurePay AI Routing Topology
                 </p>
+
+                {(userRole === 'admin' || userRole === 'dev') && (
+                    <div className="mt-4 pt-4 border-t border-slate-200">
+                        <button
+                            onClick={handleClearLedger}
+                            disabled={isClearing}
+                            className={`w-full py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-lg ${isClearing ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 text-white shadow-red-500/20 active:scale-95'}`}
+                        >
+                            {isClearing ? 'Purging Ledger...' : '☢ Purge Cloud Ledger'}
+                        </button>
+                    </div>
+                )}
 
                 {simMode ? (
                     <div className="mt-4 bg-white/95 backdrop-blur rounded-xl p-4 border border-slate-200 shadow-xl space-y-3">
