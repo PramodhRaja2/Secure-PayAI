@@ -1231,6 +1231,20 @@ const ChatInterface = ({ user, token, messages, setMessages, isAdmin = false }) 
     const [allUsers, setAllUsers] = useState([]);
     const messagesEndRef = useRef(null);
 
+    const getLastMessage = useCallback((userId) => {
+        const userMsgs = messages.filter(m => m.user_id === userId || m.from_user_id === userId);
+        return userMsgs.length > 0 ? userMsgs[0] : null;
+    }, [messages]);
+
+    const sortedUsers = [...allUsers].sort((a, b) => {
+        const msgA = getLastMessage(a.id);
+        const msgB = getLastMessage(b.id);
+        if (!msgA && !msgB) return 0;
+        if (!msgA) return 1;
+        if (!msgB) return -1;
+        return new Date(msgB.time) - new Date(msgA.time);
+    });
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
@@ -1284,21 +1298,29 @@ const ChatInterface = ({ user, token, messages, setMessages, isAdmin = false }) 
                 <div className="chat-sidebar">
                     <div className="p-4 font-bold border-bottom text-slate-500 text-[10px] uppercase tracking-wider">Conversations</div>
                     <div className="overflow-y-auto flex-1">
-                        {allUsers.map(u => (
-                            <div
-                                key={u.id}
-                                className={`chat-user-item ${selectedUser?.id === u.id ? 'active' : ''}`}
-                                onClick={() => setSelectedUser(u)}
-                            >
-                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-500 font-bold">
-                                    {u.username[0].toUpperCase()}
+                        {sortedUsers.map(u => {
+                            const lastMsg = getLastMessage(u.id);
+                            return (
+                                <div
+                                    key={u.id}
+                                    className={`chat-user-item ${selectedUser?.id === u.id ? 'active' : ''}`}
+                                    onClick={() => setSelectedUser(u)}
+                                >
+                                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-500 font-bold shrink-0">
+                                        {u.username[0].toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 min-w-0 overflow-hidden">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <div className="font-bold text-sm truncate">{u.username}</div>
+                                            {lastMsg && <div className="text-[9px] opacity-40 shrink-0">{new Date(lastMsg.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>}
+                                        </div>
+                                        <div className="text-[10px] text-slate-500 truncate">
+                                            {lastMsg ? (lastMsg.from_username === user.username ? `You: ${lastMsg.message}` : lastMsg.message) : 'Secure Line Active'}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="flex-1 min-width-0">
-                                    <div className="font-bold text-sm truncate">{u.username}</div>
-                                    <div className="text-[10px] text-slate-400">Secure Line Active</div>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}
