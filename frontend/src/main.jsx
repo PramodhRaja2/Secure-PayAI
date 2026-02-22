@@ -3,9 +3,14 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
+// Cleanup: Unregister any existing service workers that cause blank pages on refresh
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js');
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (let registration of registrations) {
+      registration.unregister();
+    }
+  }).catch((err) => {
+    console.error('Service Worker unregistration failed: ', err);
   });
 }
 
