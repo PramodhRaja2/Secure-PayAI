@@ -211,28 +211,30 @@ const DevConsole = ({ user, token, onLogout }) => {
                 {activeTab === 'history' && (
                     <div>
                         <div style={{ marginBottom: 16, fontSize: 10, color: '#64748b', letterSpacing: '0.15em' }}>FULL TRANSACTION AUDIT LOG</div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                            <thead>
-                                <tr style={{ color: '#475569', borderBottom: '1px solid #1e293b' }}>
-                                    {['ID', 'TIME', 'AMOUNT', 'STATUS', 'RISK'].map(h => <th key={h} style={{ textAlign: 'left', padding: '8px 12px', fontWeight: 700, letterSpacing: '0.1em' }}>{h}</th>)}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {history.map(t => (
-                                    <tr key={t.id} style={{ borderBottom: '1px solid #0f172a' }}>
-                                        <td style={{ padding: '10px 12px', color: '#64748b' }}>#{t.id}</td>
-                                        <td style={{ padding: '10px 12px', color: '#64748b' }}>{new Date(t.time).toLocaleString()}</td>
-                                        <td style={{ padding: '10px 12px', fontWeight: 700 }}>${t.amount?.toLocaleString()}</td>
-                                        <td style={{ padding: '10px 12px' }}>
-                                            <span style={{ background: t.approved ? '#10b98120' : '#ef444418', color: t.approved ? '#10b981' : '#ef4444', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
-                                                {t.approved ? 'AUTHORIZED' : 'DENIED'}
-                                            </span>
-                                        </td>
-                                        <td style={{ padding: '10px 12px' }}>{riskBadge(t.risk_score)}</td>
+                        <div className="table-responsive">
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, minWidth: '600px' }}>
+                                <thead>
+                                    <tr style={{ color: '#475569', borderBottom: '1px solid #1e293b' }}>
+                                        {['ID', 'TIME', 'AMOUNT', 'STATUS', 'RISK'].map(h => <th key={h} style={{ textAlign: 'left', padding: '8px 12px', fontWeight: 700, letterSpacing: '0.1em' }}>{h}</th>)}
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {history.map(t => (
+                                        <tr key={t.id} style={{ borderBottom: '1px solid #0f172a' }}>
+                                            <td style={{ padding: '10px 12px', color: '#64748b' }}>#{t.id}</td>
+                                            <td style={{ padding: '10px 12px', color: '#64748b' }}>{new Date(t.time).toLocaleString()}</td>
+                                            <td style={{ padding: '10px 12px', fontWeight: 700 }}>${t.amount?.toLocaleString()}</td>
+                                            <td style={{ padding: '10px 12px' }}>
+                                                <span style={{ background: t.approved ? '#10b98120' : '#ef444418', color: t.approved ? '#10b981' : '#ef4444', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
+                                                    {t.approved ? 'AUTHORIZED' : 'DENIED'}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '10px 12px' }}>{riskBadge(t.risk_score)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
 
@@ -393,8 +395,13 @@ const App = () => {
     const [settlementReceipt, setSettlementReceipt] = useState(null);
 
     // Auth State
-    const [user, setUser] = useState(null);
-    const [token, setToken] = useState(null);
+    const [user, setUser] = useState(() => {
+        try {
+            const saved = localStorage.getItem('securepay_user');
+            return saved ? JSON.parse(saved) : null;
+        } catch (e) { return null; }
+    });
+    const [token, setToken] = useState(() => localStorage.getItem('securepay_token') || null);
     const [loginUsername, setLoginUsername] = useState('');
     const [loginPass, setLoginPass] = useState('');
     const [authError, setAuthError] = useState('');
@@ -421,9 +428,12 @@ const App = () => {
         try {
             const resp = await API.post('/login', { username: loginUsername, password: loginPass });
             // Response includes { token, role, name, id, region, preference }
-            setUser({ role: resp.data.role, name: resp.data.name, id: resp.data.id, region: resp.data.region, preference: resp.data.preference });
+            const userData = { role: resp.data.role, name: resp.data.name, id: resp.data.id, region: resp.data.region, preference: resp.data.preference };
+            setUser(userData);
             setTxnData(prev => ({ ...prev, priority: resp.data.preference || 'balanced' }));
             setToken(resp.data.token);
+            localStorage.setItem('securepay_user', JSON.stringify(userData));
+            localStorage.setItem('securepay_token', resp.data.token);
         } catch (err) {
             setAuthError(err.response?.data?.detail || 'Invalid credentials');
         }
@@ -433,6 +443,8 @@ const App = () => {
         setUser(null);
         setToken(null);
         setActiveNav('optimizer');
+        localStorage.removeItem('securepay_user');
+        localStorage.removeItem('securepay_token');
     };
 
     const fetchHistory = async () => {
@@ -455,7 +467,7 @@ const App = () => {
                 provider: selectedProvider,
                 risk: analysis.risk_report
             });
-        }, 1500);
+        }, 500);
     };
 
     const handleAnalyze = async () => {
@@ -506,7 +518,10 @@ const App = () => {
                             <label className="form-label">Amount</label>
                             <div className="form-input-icon">
                                 <span style={{ fontSize: 20, color: '#4f7df9', fontWeight: 'bold' }}>{currentSymbol}</span>
-                                <input type="number" className="form-input" value={txnData.amount} onChange={e => setTxnData({ ...txnData, amount: parseFloat(e.target.value) || 0 })} />
+                                <input type="number" min="0" className="form-input" value={txnData.amount} onChange={e => {
+                                    const val = e.target.value;
+                                    setTxnData({ ...txnData, amount: val === '' ? '' : Number(val) });
+                                }} />
                             </div>
                         </div>
                         <div className="grid-2">
@@ -728,20 +743,22 @@ const App = () => {
                     <div className="card animate-in-up">
                         <div className="card-header"><h3>Full Institutional Directory</h3></div>
                         <div className="card-body">
-                            <table className="provider-table w-full">
-                                <thead><tr><th>Financial Institution</th><th>Spot Rate</th><th>Order Cost</th><th>ETA</th><th>Score</th></tr></thead>
-                                <tbody>
-                                    {analysis.fx_report.comparisons.map((p, i) => (
-                                        <tr key={i} className={selectedProvider?.provider === p.provider ? 'selected' : ''} onClick={() => setSelectedProvider(p)}>
-                                            <td className="font-bold">{p.provider}</td>
-                                            <td className="mono text-blue-400">{p.provider_rate.toFixed(4)}</td>
-                                            <td className="mono text-red-400">${p.total_cost_usd.toFixed(2)}</td>
-                                            <td className="mono">{p.eta_hours}h</td>
-                                            <td className="mono font-bold text-green-400">{p.weighted_score}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                            <div className="table-responsive">
+                                <table className="provider-table w-full" style={{ minWidth: '600px' }}>
+                                    <thead><tr><th>Financial Institution</th><th>Spot Rate</th><th>Order Cost</th><th>ETA</th><th>Score</th></tr></thead>
+                                    <tbody>
+                                        {analysis.fx_report.comparisons.map((p, i) => (
+                                            <tr key={i} className={selectedProvider?.provider === p.provider ? 'selected' : ''} onClick={() => setSelectedProvider(p)}>
+                                                <td className="font-bold">{p.provider}</td>
+                                                <td className="mono text-blue-400">{p.provider_rate.toFixed(4)}</td>
+                                                <td className="mono text-red-400">${p.total_cost_usd.toFixed(2)}</td>
+                                                <td className="mono">{p.eta_hours}h</td>
+                                                <td className="mono font-bold text-green-400">{p.weighted_score}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 ) : noDataYet
@@ -750,14 +767,16 @@ const App = () => {
                 <div className="card animate-in-up">
                     <div className="card-header"><h3>Secure Audit Ledger</h3></div>
                     <div className="card-body">
-                        <table className="provider-table w-full">
-                            <thead><tr><th>Sync Time</th><th>Transaction Value</th><th>Decision</th></tr></thead>
-                            <tbody>
-                                {history.slice().reverse().map((h, i) => (
-                                    <tr key={i}><td>{new Date(h.time).toLocaleString()}</td><td className="font-bold">${h.amount.toLocaleString()}</td><td><span className={`go-badge ${h.approved ? 'go' : 'nogo'}`}>{h.approved ? 'AUTHORIZED' : 'DENIED'}</span></td></tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        <div className="table-responsive">
+                            <table className="provider-table w-full" style={{ minWidth: '500px' }}>
+                                <thead><tr><th>Sync Time</th><th>Transaction Value</th><th>Decision</th></tr></thead>
+                                <tbody>
+                                    {history.slice().reverse().map((h, i) => (
+                                        <tr key={i}><td>{new Date(h.time).toLocaleString()}</td><td className="font-bold">${h.amount.toLocaleString()}</td><td><span className={`go-badge ${h.approved ? 'go' : 'nogo'}`}>{h.approved ? 'AUTHORIZED' : 'DENIED'}</span></td></tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             );
@@ -931,7 +950,9 @@ const App = () => {
                             </div>
                         )}
                         {authError && <div className="auth-error">{authError}</div>}
-                        <button type="submit" className="login-btn mb-4">{isRegistering ? 'Initialize Account' : 'Secure Login'}</button>
+                        <button type="submit" className="login-btn mb-4" onClick={(e) => { e.preventDefault(); isRegistering ? handleRegister(e) : handleLogin(e); }}>
+                            {isRegistering ? 'Initialize Account' : 'Secure Login'}
+                        </button>
                         <div className="text-center text-xs opacity-50 cursor-pointer font-bold hover:text-blue-500 transition-colors" onClick={() => { setIsRegistering(!isRegistering); setAuthError(''); }}>
                             {isRegistering ? 'Already have access? Proceed to login.' : 'New user? Request an access profile here.'}
                         </div>
@@ -1269,51 +1290,53 @@ const UserManagement = ({ token, user }) => {
                     <div className="tag">Active Directory</div>
                 </div>
                 <div className="card-body">
-                    <table className="provider-table w-full">
-                        <thead><tr><th>Username</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
-                        <tbody>
-                            {users.map(u => (
-                                <tr key={u.id}>
-                                    <td className="font-bold">{u.username}</td>
-                                    <td className="uppercase text-[10px] opacity-60 font-bold">{u.role}</td>
-                                    <td>
-                                        <span className={`px-2 py-1 rounded-full text-[9px] font-bold ${u.is_blocked ? 'bg-red-500/20 text-red-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
-                                            {u.is_blocked ? 'LOCKED' : 'ACTIVE'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => {
-                                                const msg = window.prompt("Enter direct message to send to user:");
-                                                if (msg) API.post('/admin/alerts', { user_id: u.id, message: msg, type: 'info' }, { headers: { Authorization: token } });
-                                            }} className="p-1 hover:text-emerald-400 transition-colors" title="Send Direct Message">
-                                                <Send size={14} />
-                                            </button>
-                                            <button onClick={() => {
-                                                const msg = window.prompt("Enter threat notification message:");
-                                                if (msg) API.post('/admin/alerts', { user_id: u.id, message: msg, type: 'threat' }, { headers: { Authorization: token } });
-                                            }} className="p-1 hover:text-blue-400 transition-colors" title="Send Alert">
-                                                <Zap size={14} />
-                                            </button>
-                                            <button onClick={() => toggleBlock(u.id)} className="p-1 hover:text-orange-400 transition-colors" title={u.is_blocked ? "Unblock" : "Block"}>
-                                                <Lock size={14} className={u.is_blocked ? "text-red-500" : ""} />
-                                            </button>
-                                            {u.role !== 'dev' && (
-                                                <button onClick={() => toggleRole(u.id, u.role)} className={`p-1 hover:text-purple-500 transition-colors ${u.role === 'admin' ? 'text-purple-400' : 'opacity-40 hover:opacity-100'}`} title={u.role === 'admin' ? "Demote Admin" : "Promote to Admin"}>
-                                                    <Shield size={14} />
+                    <div className="table-responsive">
+                        <table className="provider-table w-full" style={{ minWidth: '800px' }}>
+                            <thead><tr><th>Username</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                            <tbody>
+                                {users.map(u => (
+                                    <tr key={u.id}>
+                                        <td className="font-bold">{u.username}</td>
+                                        <td className="uppercase text-[10px] opacity-60 font-bold">{u.role}</td>
+                                        <td>
+                                            <span className={`px-2 py-1 rounded-full text-[9px] font-bold ${u.is_blocked ? 'bg-red-500/20 text-red-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
+                                                {u.is_blocked ? 'LOCKED' : 'ACTIVE'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => {
+                                                    const msg = window.prompt("Enter direct message to send to user:");
+                                                    if (msg) API.post('/admin/alerts', { user_id: u.id, message: msg, type: 'info' }, { headers: { Authorization: token } });
+                                                }} className="p-1 hover:text-emerald-400 transition-colors" title="Send Direct Message">
+                                                    <Send size={14} />
                                                 </button>
-                                            )}
-                                            {u.role !== 'dev' && (user?.role === 'dev' || u.role === 'user' || user?.id === u.id) && (
-                                                <button onClick={() => deleteUser(u.id)} className="p-1 hover:text-red-500 transition-colors">
-                                                    <X size={14} />
+                                                <button onClick={() => {
+                                                    const msg = window.prompt("Enter threat notification message:");
+                                                    if (msg) API.post('/admin/alerts', { user_id: u.id, message: msg, type: 'threat' }, { headers: { Authorization: token } });
+                                                }} className="p-1 hover:text-blue-400 transition-colors" title="Send Alert">
+                                                    <Zap size={14} />
                                                 </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                                <button onClick={() => toggleBlock(u.id)} className="p-1 hover:text-orange-400 transition-colors" title={u.is_blocked ? "Unblock" : "Block"}>
+                                                    <Lock size={14} className={u.is_blocked ? "text-red-500" : ""} />
+                                                </button>
+                                                {u.role !== 'dev' && (
+                                                    <button onClick={() => toggleRole(u.id, u.role)} className={`p-1 hover:text-purple-500 transition-colors ${u.role === 'admin' ? 'text-purple-400' : 'opacity-40 hover:opacity-100'}`} title={u.role === 'admin' ? "Demote Admin" : "Promote to Admin"}>
+                                                        <Shield size={14} />
+                                                    </button>
+                                                )}
+                                                {u.role !== 'dev' && (user?.role === 'dev' || u.role === 'user' || user?.id === u.id) && (
+                                                    <button onClick={() => deleteUser(u.id)} className="p-1 hover:text-red-500 transition-colors">
+                                                        <X size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

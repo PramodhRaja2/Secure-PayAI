@@ -274,10 +274,11 @@ body {
 }
 
 @media (max-width: 640px) {
-    .grid-4 {
+    .grid-main {
         grid-template-columns: 1fr;
     }
 
+    .grid-4,
     .grid-2 {
         grid-template-columns: 1fr;
     }
@@ -291,6 +292,30 @@ body {
     .header-actions {
         flex-wrap: wrap;
     }
+
+    .main-content {
+        padding: 20px 16px 60px;
+    }
+
+    .card-header,
+    .card-body {
+        padding: 20px 16px;
+    }
+
+    .login-card {
+        padding: 32px 20px;
+    }
+
+    .stats-grid-compact {
+        grid-template-columns: 1fr;
+        padding: 16px;
+    }
+}
+
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* ===== CARDS & GLASS ===== */

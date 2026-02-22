@@ -3,10 +3,21 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 import datetime
 import os
 
-# Database path
-DB_PATH = "sqlite:///./securepay.db"
+# Check for a cloud database URL (e.g. from Render/Railway/Heroku)
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-engine = create_engine(DB_PATH, connect_args={"check_same_thread": False})
+if DATABASE_URL:
+    # Most cloud providers give postgres://, but SQLAlchemy requires postgresql://
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
+    # Connect to Cloud Postgres
+    engine = create_engine(DATABASE_URL)
+else:
+    # Fallback to local SQLite if no environment variable is set
+    DATABASE_URL = "sqlite:///./securepay.db"
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 

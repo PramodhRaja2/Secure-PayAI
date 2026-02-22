@@ -102,6 +102,11 @@ async def login(req: LoginRequest):
             db.close()
             raise HTTPException(status_code=403, detail="Account is blocked. Contact Admin.")
         
+        # Enforce single session per user: revoke existing tokens
+        stale_tokens = [tok for tok, un in sessions.items() if un.lower() == user.username.lower()]
+        for tok in stale_tokens:
+            del sessions[tok]
+            
         token = str(uuid.uuid4())
         sessions[token] = user.username
         # Store metadata in response for frontend
@@ -137,6 +142,11 @@ async def register(req: RegisterRequest):
     db.add(new_user)
     db.commit()
     
+    # Enforce single session per user: revoke existing tokens (just in case)
+    stale_tokens = [tok for tok, un in sessions.items() if un.lower() == new_user.username.lower()]
+    for tok in stale_tokens:
+        del sessions[tok]
+        
     # Auto-login the newly created user
     token = str(uuid.uuid4())
     sessions[token] = new_user.username
