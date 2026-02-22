@@ -207,6 +207,21 @@ async def get_admin_messages():
     db.close()
     return msgs
 
+@app.delete("/admin/messages/clear")
+async def clear_admin_messages(authorization: str = Header(None)):
+    db = SessionLocal()
+    token = authorization
+    if not token or token not in sessions or sessions[token] != "admin":
+        db.close()
+        raise HTTPException(status_code=403, detail="Only Admins can clear the support inbox")
+    
+    admin = db.query(UserProfile).filter(UserProfile.role == "admin").first()
+    if admin:
+        db.query(Alert).filter(Alert.user_id == admin.id, Alert.type == "user_message").delete()
+        db.commit()
+    db.close()
+    return {"status": "success"}
+
 # --- DEV ENDPOINTS ---
 
 @app.get("/dev/pending")
@@ -259,6 +274,24 @@ async def get_dev_messages():
     db.close()
     return msgs
 
+@app.delete("/dev/messages/clear")
+async def clear_dev_messages(authorization: str = Header(None)):
+    db = SessionLocal()
+    if not authorization or authorization not in sessions:
+        db.close()
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    un = sessions[authorization]
+    dev = db.query(UserProfile).filter(UserProfile.username == un, UserProfile.role == "dev").first()
+    if not dev:
+        db.close()
+        raise HTTPException(status_code=403, detail="Only DevOps can clear this terminal")
+    
+    db.query(Alert).filter(Alert.user_id == dev.id).delete()
+    db.commit()
+    db.close()
+    return {"status": "success"}
+
 @app.get("/dev/users")
 async def get_dev_users():
     db = SessionLocal()
@@ -267,18 +300,22 @@ async def get_dev_users():
     return [{"id": u.id, "username": u.username, "role": u.role} for u in users]
 
 @app.post("/dev/message")
-async def send_dev_message(payload: dict):
+async def send_dev_message(payload: dict, authorization: str = Header(None)):
     # payload: { target_id: int, message: str }
     db = SessionLocal()
+    sender_name = "DEVOPS"
+    if authorization and authorization in sessions:
+        sender_name = sessions[authorization] # Track actual dev username
+        
     target_id = payload.get("target_id")
     msg_text = payload.get("message")
     if target_id == 0:
         # Broadcast
         users = db.query(UserProfile).filter(UserProfile.role != "dev").all()
         for u in users:
-            db.add(Alert(user_id=u.id, from_username="DEVOPS", type="info", message=msg_text))
+            db.add(Alert(user_id=u.id, from_username=sender_name, type="info", message=msg_text))
     else:
-        db.add(Alert(user_id=target_id, from_username="DEVOPS", type="info", message=msg_text))
+        db.add(Alert(user_id=target_id, from_username=sender_name, type="info", message=msg_text))
     db.commit()
     db.close()
     return {"status": "sent"}
@@ -400,12 +437,17 @@ async def delete_user(user_id: int, authorization: str = Header(None)):
     return {"status": "success"}
 
 @app.post("/admin/alerts")
-async def send_alert(alert: dict):
+async def send_alert(alert: dict, authorization: str = Header(None)):
     # alert: { "user_id": int, "message": str, "type": str }
     db = SessionLocal()
+    sender_name = "ADMIN"
+    if authorization and authorization in sessions:
+        sender_name = sessions[authorization]
+        
     new_alert = Alert(
         user_id=alert["user_id"],
         message=alert["message"],
+        from_username=sender_name,
         type=alert.get("type", "security")
     )
     db.add(new_alert)
@@ -419,6 +461,21 @@ async def get_my_alerts(user_id: int):
     alerts = db.query(Alert).filter(Alert.user_id == user_id).order_by(Alert.time.desc()).all()
     db.close()
     return alerts
+
+@app.delete("/alerts/clear")
+async def clear_my_alerts(authorization: str = Header(None)):
+    db = SessionLocal()
+    if not authorization or authorization not in sessions:
+        db.close()
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    un = sessions[authorization]
+    user = db.query(UserProfile).filter(UserProfile.username == un).first()
+    if user:
+        db.query(Alert).filter(Alert.user_id == user.id).delete()
+        db.commit()
+    db.close()
+    return {"status": "success"}
 
 @app.post("/logout")
 async def logout(request: Request):
@@ -448,20 +505,23 @@ async def delete_alert(alert_id: int, authorization: str = Header(None)):
         db.close()
         raise HTTPException(status_code=404, detail="Alert not found")
         
+    # Find the sender's role to see if it's a dev message
+    sender_role = "user"
+    if alert.from_username:
+        sender = db.query(UserProfile).filter(func.lower(UserProfile.username) == alert.from_username.lower()).first()
+        if sender:
+            sender_role = sender.role
+    
     # Permission Logic:
     # 1. Dev (Pramodhraja) can delete anything.
-    # 2. If it's a DEVOPS message, only Dev can delete it.
-    # 3. Otherwise, the recipient or an admin can delete it.
+    # 2. If it's a message FROM a dev, only a dev can delete it.
     
-    can_delete = False
     if requester.role == "dev":
-        can_delete = True
-    elif alert.from_username == "DEVOPS":
-        can_delete = False # Only dev checked above can delete DEVOPS messages
-    elif alert.user_id == requester.id or requester.role == "admin":
-        can_delete = True
-        
-    if not can_delete:
+        pass # Full access
+    elif sender_role == "dev" or alert.from_username == "DEVOPS":
+        db.close()
+        raise HTTPException(status_code=403, detail="Protected: Only DevOps can delete messages sent by dev accounts")
+    elif not (alert.user_id == requester.id or requester.role == "admin"):
         db.close()
         raise HTTPException(status_code=403, detail="Permission denied to delete this message")
         

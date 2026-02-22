@@ -1207,6 +1207,235 @@ const App = () => {
     );
 };
 
+/* ─────────── DEV CONSOLE ─────────── */
+const DevConsole = ({ user, token, onLogout }) => {
+    const [activeTab, setActiveTab] = useState('overview');
+    const [stats, setStats] = useState(null);
+    const [pending, setPending] = useState([]);
+    const [messages, setMessages] = useState([]);
+    const [devMsg, setDevMsg] = useState('');
+    const [targetUser, setTargetUser] = useState('0'); // 0 for all users (broadcast)
+    const [users, setUsers] = useState([]); // For user list in broadcast
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [statsResp, pendingResp, messagesResp, usersResp] = await Promise.all([
+                    API.get('/dev/stats', { headers: { Authorization: token } }),
+                    API.get('/dev/pending', { headers: { Authorization: token } }),
+                    API.get('/dev/messages', { headers: { Authorization: token } }),
+                    API.get('/admin/users', { headers: { Authorization: token } }) // Fetch all users for broadcast
+                ]);
+                setStats(statsResp.data);
+                setPending(pendingResp.data);
+                setMessages(messagesResp.data);
+                setUsers(usersResp.data);
+            } catch (e) { console.error("Failed to fetch dev data:", e); }
+        };
+        fetchData();
+    }, [token]);
+
+    const review = async (id, action) => {
+        try {
+            await API.patch(`/dev/transactions/${id}/review`, { action }, { headers: { Authorization: token } });
+            setPending(prev => prev.filter(t => t.id !== id));
+        } catch (e) { alert(e.response?.data?.detail || "Review failed"); }
+    };
+
+    const riskBadge = (score) => {
+        if (score > 80) return 'CRITICAL';
+        if (score > 60) return 'HIGH';
+        if (score > 40) return 'MEDIUM';
+        return 'LOW';
+    };
+
+    const handleSendMessage = async (e) => {
+        e.preventDefault();
+        if (!devMsg.trim()) return;
+        try {
+            await API.post('/dev/message', { target_id: targetUser, message: devMsg }, { headers: { Authorization: token } });
+            setDevMsg('');
+        } catch (e) { alert(e.response?.data?.detail || "Send failed"); }
+    };
+
+    const handleWipeData = async () => {
+        if (!window.confirm("Are you absolutely sure you want to wipe ALL transactional and alert data? This action is irreversible.")) return;
+        try {
+            await API.delete('/dev/wipe', { headers: { Authorization: token } });
+            alert("Data wipe initiated successfully.");
+            setStats(prev => ({ ...prev, total_transactions: 0, pending: 0 }));
+            setPending([]);
+        } catch (e) { alert(e.response?.data?.detail || "Data wipe failed"); }
+    };
+
+    const handleClearComms = async () => {
+        if (!window.confirm("Broadcast wipe? This will clear your personal dev inbox.")) return;
+        try {
+            await API.delete('/dev/messages/clear', { headers: { Authorization: token } });
+            setMessages([]);
+        } catch (e) { alert(e.response?.data?.detail || "Clear failed"); }
+    };
+
+    return (
+        <div className="card border-blue-500/30 overflow-hidden shadow-2xl shadow-blue-500/10">
+            <div className="card-header bg-slate-900 border-b border-blue-500/20 flex justify-between items-center py-4 px-6">
+                <div className="flex items-center gap-3">
+                    <div className="bg-blue-500 p-2 rounded-lg text-white shadow-lg shadow-blue-500/30"><Cpu size={18} /></div>
+                    <div>
+                        <h3 className="text-white font-black tracking-tight">Security Terminal</h3>
+                        <div className="text-[10px] text-blue-400 font-bold uppercase tracking-widest opacity-70">DevOps Workspace</div>
+                    </div>
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[10px] text-white/50 font-bold uppercase tracking-tighter">API V4.5_STABLE</span>
+                    </div>
+                    <button onClick={onLogout} className="text-red-400 hover:text-red-300 transition-colors p-1" title="Kill Session"><X size={18} /></button>
+                </div>
+            </div>
+
+            <div className="p-1 bg-slate-800/50 flex border-b border-blue-500/10">
+                {['overview', 'pending', 'comms', 'wipe'].map(t => (
+                    <button
+                        key={t}
+                        onClick={() => setActiveTab(t)}
+                        className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest transition-all ${activeTab === t ? 'text-white bg-blue-600 shadow-inner' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}`}
+                    >
+                        {t}
+                    </button>
+                ))}
+            </div>
+
+            <div className="card-body bg-slate-950 min-h-[500px] p-6 text-slate-300 font-mono text-sm relative">
+                {activeTab === 'overview' && (
+                    <div className="space-y-6 animate-in">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="stats-mini border-slate-800 bg-slate-900/50">
+                                <span className="label">Total TXNs</span>
+                                <span className="value text-white">{stats?.total_transactions || 0}</span>
+                            </div>
+                            <div className="stats-mini border-slate-800 bg-slate-900/50">
+                                <span className="label">Pending</span>
+                                <span className="value text-amber-400">{stats?.pending || 0}</span>
+                            </div>
+                        </div>
+                        <div className="space-y-2 border-l-2 border-slate-800 pl-4 py-1">
+                            {['Kernel', 'FX Service', 'Biometrics', 'DB_Sync'].map(s => (
+                                <div key={s} className="flex justify-between items-center text-[10px]">
+                                    <span className="opacity-50">{s}::Status</span>
+                                    <span className="text-emerald-500 font-bold">READY</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'pending' && (
+                    <div className="space-y-4 animate-in">
+                        {pending.length === 0 ? (
+                            <div className="text-center py-20 opacity-20">NO PENDING_TXNS IN BUFFER</div>
+                        ) : (
+                            pending.map(t => (
+                                <div key={t.id} className="p-4 bg-slate-900 border border-slate-800 rounded-xl hover:border-blue-500/30 transition-all">
+                                    <div className="flex justify-between text-[11px] mb-3">
+                                        <span className="text-blue-400">TXN_{t.id}</span>
+                                        <span className="opacity-50">{new Date(t.time).toLocaleTimeString()}</span>
+                                    </div>
+                                    <div className="text-xl font-bold text-white mb-2">{t.amount} {t.base_currency}</div>
+                                    <div className="text-xs space-y-1 mb-4 opacity-70">
+                                        <div>GEO: {t.location}</div>
+                                        <div>LEVEL: {riskBadge(t.risk_score)} {t.risk_level} ({t.risk_score})</div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => review(t.id, 'approve')} className="flex-1 py-2 bg-emerald-600 text-white text-[10px] font-bold uppercase rounded-lg">Approve</button>
+                                        <button onClick={() => review(t.id, 'deny')} className="flex-1 py-2 bg-red-600 text-white text-[10px] font-bold uppercase rounded-lg">Deny</button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'comms' && (
+                    <div className="space-y-4 animate-in">
+                        <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2">
+                            <span className="text-[10px] opacity-40 uppercase font-black tracking-widest">Inbound Directives</span>
+                            <button onClick={handleClearComms} className="text-[10px] text-red-500 hover:text-red-400 font-bold uppercase underline">Clear Terminal</button>
+                        </div>
+                        <div className="max-h-[250px] overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-800">
+                            {messages.length === 0 ? (
+                                <div className="text-center py-10 opacity-20">NO_INBOUND_COMMS</div>
+                            ) : (
+                                messages.map(m => (
+                                    <div key={m.id} className="p-3 bg-slate-900 border border-slate-800 rounded-xl group relative">
+                                        <div className="flex justify-between text-[9px] mb-1">
+                                            <span className="text-blue-400 font-bold uppercase tracking-tighter">Sender: {m.from_username || 'SYSTEM'}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="opacity-40">{new Date(m.time).toLocaleTimeString()}</span>
+                                                <button
+                                                    onClick={() => {
+                                                        if (window.confirm("Delete this log entry?")) {
+                                                            API.delete(`/alerts/${m.id}`, { headers: { Authorization: token } })
+                                                                .then(() => setMessages(prev => prev.filter(x => x.id !== m.id)))
+                                                                .catch(e => alert(e.response?.data?.detail || "Delete failed"));
+                                                        }
+                                                    }}
+                                                    className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all"
+                                                >
+                                                    <Trash2 size={10} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p className="text-[11px] opacity-70 leading-tight">{m.message}</p>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        <div className="h-[1px] bg-slate-800 mt-6 mb-4" />
+                        <form onSubmit={handleSendMessage} className="space-y-3">
+                            <div className="text-[10px] opacity-40 uppercase font-black tracking-widest">Transmit Protocol</div>
+                            <div className="flex gap-2">
+                                <select
+                                    value={targetUser}
+                                    onChange={e => setTargetUser(e.target.value)}
+                                    className="bg-slate-900 border border-slate-800 p-2 rounded-lg text-xs outline-none focus:border-blue-500"
+                                >
+                                    <option value="0">ALL_USERS (BROADCAST)</option>
+                                    {users.filter(u => u.role !== 'dev').map(u => (
+                                        <option key={u.id} value={u.id}>UID_{u.id}: {u.username}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={devMsg}
+                                    onChange={e => setDevMsg(e.target.value)}
+                                    placeholder="COMMAND_PACKET_STRING..."
+                                    className="flex-1 bg-slate-900 border border-slate-800 p-2 rounded-lg text-xs outline-none focus:border-blue-500"
+                                />
+                                <button type="submit" className="bg-blue-600 text-white px-4 rounded-lg hover:bg-blue-500 transition-colors"><Send size={14} /></button>
+                            </div>
+                        </form>
+                    </div>
+                )}
+
+                {activeTab === 'wipe' && (
+                    <div className="flex flex-col items-center justify-center min-h-[300px] text-center space-y-6 animate-in">
+                        <div className="text-red-500 animate-pulse"><Zap size={48} /></div>
+                        <div>
+                            <h4 className="text-white font-black uppercase tracking-widest mb-2">Nuclear Protocol</h4>
+                            <p className="text-[10px] opacity-50 px-8">Executing this will wipe all Transactional and Alert logs from the primary DB cluster. Users and roles are preserved.</p>
+                        </div>
+                        <button onClick={handleWipeData} className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-tighter rounded-full shadow-lg shadow-red-900/40 transition-all hover:scale-105 active:scale-95">Wipe Data Clusters</button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 /* ─────────── ALERT / INBOX SYSTEM ─────────── */
 const AlertList = ({ token, user }) => {
     const [alerts, setAlerts] = useState([]);
@@ -1237,18 +1466,31 @@ const AlertList = ({ token, user }) => {
         setSending(false);
     };
 
+    const handleClearAlerts = async () => {
+        if (!window.confirm("Clear all alerts in your inbox?")) return;
+        try {
+            await API.delete('/alerts/clear', { headers: { Authorization: token } });
+            setAlerts([]);
+        } catch (e) { alert(e.response?.data?.detail || "Clear failed"); }
+    };
+
     return (
         <div className="animate-in-up space-y-6">
             <div className="card">
-                <div className="card-header"><h3>Message Inbox & Security Broadcasts</h3></div>
+                <div className="card-header flex justify-between items-center">
+                    <h3>Message Inbox & Security Broadcasts</h3>
+                    {alerts.length > 0 && (
+                        <button onClick={handleClearAlerts} className="text-[10px] text-red-500 hover:text-red-400 font-bold uppercase underline">Clear All Alerts</button>
+                    )}
+                </div>
                 <div className="card-body">
                     {alerts.length === 0 ? (
                         <div className="text-center py-12 opacity-30"><Shield size={40} className="mx-auto mb-4" />No active messages or broadcasts.</div>
                     ) : (
                         <div className="space-y-4">
                             {alerts.map(a => {
-                                const isDevOps = a.from_username === 'DEVOPS';
-                                const canDelete = user.role === 'dev' || !isDevOps;
+                                const isDevMessage = a.from_username === 'DEVOPS' || a.from_username?.toLowerCase() === 'pramodhraja';
+                                const canDelete = user.role === 'dev' || !isDevMessage;
                                 return (
                                     <div key={a.id} className={`p-4 rounded-2xl border ${a.type === 'threat' ? 'bg-red-500/10 border-red-500/20' : 'bg-blue-500/10 border-blue-500/20'}`}>
                                         <div className="flex justify-between items-start mb-2">
@@ -1320,13 +1562,26 @@ const AdminMessages = ({ token }) => {
             .catch(() => setLoading(false));
     }, [token]);
 
+    const handleClearInbox = async () => {
+        if (!window.confirm("Clear all support messages? This cannot be undone.")) return;
+        try {
+            await API.delete('/admin/messages/clear', { headers: { Authorization: token } });
+            setMessages([]);
+        } catch (e) { alert(e.response?.data?.detail || "Clear failed"); }
+    };
+
     if (loading) return <div className="p-12 text-center opacity-40">Loading messages…</div>;
 
     return (
         <div className="card animate-in-up">
             <div className="card-header flex justify-between items-center">
                 <h3>User Support Inbox</h3>
-                <div className="tag">{messages.length} message{messages.length !== 1 ? 's' : ''}</div>
+                <div className="flex items-center gap-4">
+                    {messages.length > 0 && (
+                        <button onClick={handleClearInbox} className="text-[10px] text-red-500 hover:text-red-400 font-bold uppercase underline">Clear Support Inbox</button>
+                    )}
+                    <div className="tag">{messages.length} message{messages.length !== 1 ? 's' : ''}</div>
+                </div>
             </div>
             <div className="card-body">
                 {messages.length === 0 ? (
