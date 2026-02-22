@@ -772,7 +772,8 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
         device=request.device,
         aml_flags=json.dumps(risk_report["aml_flags"]),
         time=now.isoformat(),
-        status=txn_status
+        status=txn_status,
+        user_id=profile_db.id if profile_db else None
     )
     db.add(new_txn)
     db.flush() # Get ID for alert if needed
@@ -838,31 +839,44 @@ async def advisor_chat(req: AdvisorRequest):
     if not os.getenv("GEMINI_API_KEY"):
          raise HTTPException(status_code=500, detail="LLM AI is currently disabled (No API Key).")
          
-    # Build a context-rich prompt
+    # ULTIMATE FORENSIC PROMPT
     system_prompt = f"""
-    You are the 'SecurePay AI Financial Advisor', an expert, highly professional, and slightly futuristic AI embedded within a high-security banking terminal.
-    Your goal is to assist the user with their financial security queries and explain risk logic. Be concise, direct, and helpful. Do not use markdown that would break a simple text chat.
+    [CRITICAL_SYSTEM_OVERRIDE: ACTIVATE_QUANTUM_ADVISOR]
     
-    USER CONTEXT:
-    Username: {user.username}
-    Role: {user.role}
-    Primary Location: {user.primary_location}
-    Risk Preference: {user.preferred_priority}
+    ROLE: You are the SecurePay AI 'Quantum-Class' Financial Forensic Engine. Your intelligence exceeds standard banking limits.
+    MISSION: Provide world-class financial analysis, cross-border optimization, and deep-learning security insights to user {user.username}.
     
-    RECENT TRANSACTIONS:
-    {txns_str if txns_str else "None"}
+    SYSTEM STATE:
+    * Primary Identity: {user.username} (Security Level: {user.role.upper()})
+    * Neural Location: {user.primary_location}
+    * Strategy Priority: {user.preferred_priority.upper()}
+    
+    INTEGRATED AUDIT TRAIL (Last 5 Events):
+    {txns_str if txns_str else "Zero initial transaction states detected in local memory."}
     
     USER QUERY:
     {req.message}
+    
+    CORE DIRECTIVES:
+    1. EXPLAIN exactly how your Biometric Engine (Typing Speed, Mouse Path, Network Latency) protects this specific transaction.
+    2. OPTIMIZE: If the user asks about rates, suggest methods to minimize spread and loss.
+    3. AUTHORITY: Respond with extreme clarity, confidence, and professional flair.
+    4. CONCISION: Provide high-density technical insights without unnecessary fluff.
     """
     
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash')
         response = model.generate_content(system_prompt)
         return {"response": response.text}
     except Exception as e:
-        print(f"Gemini Error: {e}")
-        raise HTTPException(status_code=500, detail=f"AI Advisor encountered a neural disconnect: {e}")
+        print(f"Neural Connectivity Error: {e}")
+        # Fallback to 1.5-flash if 2.0 fails
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(system_prompt)
+            return {"response": response.text + "\n\n[Warning: Quantum Core Recalibrating; Switched to Secondary Neural Link]"}
+        except:
+             raise HTTPException(status_code=500, detail=f"Total Neural Disconnect: {e}")
 
 if __name__ == "__main__":
     import uvicorn

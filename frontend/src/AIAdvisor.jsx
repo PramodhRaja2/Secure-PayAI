@@ -2,11 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Send, Activity, ShieldCheck, Sparkles } from 'lucide-react';
 
-const API = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8001' });
+const API = axios.create({
+    baseURL: 'https://secure-payai.onrender.com', // Force match main App config
+    headers: { 'Bypass-Tunnel-Reminder': 'true' }
+});
 
 const AIAdvisor = ({ user, token }) => {
     const [messages, setMessages] = useState([
-        { role: 'assistant', text: `Greetings, ${user.username}. I am the SecurePay AI Advisor. How can I assist you with your financial security or transaction routing today?` }
+        { role: 'assistant', text: `Greetings, ${user.username}. I am the SecurePay AI Quantum Optimizer. I have synchronized with the global risk ledger. How can I assist you with your forensic financial analysis today?` }
     ]);
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -37,8 +40,9 @@ const AIAdvisor = ({ user, token }) => {
 
             setMessages(prev => [...prev, { role: 'assistant', text: res.data.response }]);
         } catch (err) {
-            console.error(err);
-            setMessages(prev => [...prev, { role: 'assistant', text: err.response?.data?.detail || "Connection to Neural Net failed. Please try again." }]);
+            console.error("AI Connect Error:", err);
+            const errorMsg = err.response?.data?.detail || "The Neural Net is currently recalibrating its forensic cores. Please verify your connection status and try again.";
+            setMessages(prev => [...prev, { role: 'assistant', text: `ERROR: ${errorMsg}` }]);
         } finally {
             setIsTyping(false);
         }

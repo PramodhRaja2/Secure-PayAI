@@ -41,6 +41,7 @@ class Transaction(Base):
     device = Column(String)
     aml_flags = Column(String) # JSON string
     status = Column(String, default="approved")  # approved | denied | pending | dev_approved | dev_denied
+    user_id = Column(Integer, nullable=True) # ID of user who initiated the txn
 
 class UserProfile(Base):
     __tablename__ = "profiles"
