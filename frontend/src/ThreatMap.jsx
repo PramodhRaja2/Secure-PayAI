@@ -52,7 +52,7 @@ const ThreatMap = ({ transactions }) => {
             const endLoc = CURRENCY_HUBS[t.target_currency] || CURRENCY_HUBS['EUR'];
 
             // If threat/blocked (risk > 60), make it red. Otherwise green.
-            const isThreat = t.risk_score > 60 || t.status.includes('denied');
+            const isThreat = t.risk_score > 60 || (t.status && t.status.includes('denied'));
             const color = isThreat ? '#ef4444' : '#10b981'; // Tailwind Red-500 : Emerald-500
 
             return {
