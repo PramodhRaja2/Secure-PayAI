@@ -945,6 +945,11 @@ body {
     color: var(--accent-red);
 }
 
+.factor-icon.normal {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--accent-emerald);
+}
+
 .factor-info {
     flex: 1;
     min-width: 0;
@@ -967,6 +972,102 @@ body {
     font-weight: 700;
     font-size: 14px;
     color: var(--accent-amber);
+}
+
+/* ===== SHIMMER ANIMATION ===== */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.shimmer-bar {
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(59, 130, 246, 0.15) 50%,
+            transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2.5s ease-in-out infinite;
+}
+
+/* ===== SHINY TEXT ===== */
+@keyframes shiny-slide {
+    0% {
+        background-position: -200% center;
+    }
+
+    100% {
+        background-position: 200% center;
+    }
+}
+
+.shiny-text {
+    background: linear-gradient(90deg,
+            var(--text-primary) 0%,
+            var(--text-primary) 35%,
+            var(--accent-blue) 50%,
+            var(--text-primary) 65%,
+            var(--text-primary) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shiny-slide 3s linear infinite;
+}
+
+.shiny-text-emerald {
+    background: linear-gradient(90deg,
+            var(--accent-emerald) 0%,
+            var(--accent-emerald) 35%,
+            #6ee7b7 50%,
+            var(--accent-emerald) 65%,
+            var(--accent-emerald) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shiny-slide 3s linear infinite;
+}
+
+/* ===== DECRYPTED TEXT ===== */
+@keyframes decrypt-glitch {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.8;
+    }
+}
+
+/* ===== CACHE HEALTH DOT ===== */
+.cache-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.cache-dot.fresh {
+    background: var(--accent-emerald);
+    box-shadow: 0 0 6px var(--accent-emerald);
+}
+
+.cache-dot.stale {
+    background: var(--accent-amber);
+    box-shadow: 0 0 6px var(--accent-amber);
+}
+
+.cache-dot.error {
+    background: var(--accent-red);
+    box-shadow: 0 0 6px var(--accent-red);
 }
 
 .decision-note {

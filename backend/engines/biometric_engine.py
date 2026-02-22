@@ -246,6 +246,10 @@ class BiometricEngine:
 
         return anomalies
 
+    def get_baseline_full(self):
+        """Returns the full baseline profile for UI synchronization."""
+        return self.baselines["default"]
+
     def calculate_unified_risk_score(self, current_metrics, corridor_risk, history_velocity=0):
         """Unified risk assessment combining multiple factors from proooject"""
         profile = self.baselines["default"]
@@ -310,6 +314,7 @@ class BiometricEngine:
             "aml_flags": [f["factor"] for f in anomalies if f["status"] == "critical"],
             "breakdown": anomalies,
             "ml_insight": ml_res,
+            "baseline_profile": profile,
             "unified_breakdown": {
                 "behavioral": round(behavioral_score, 2),
                 "ml_anomaly": round(ml_score, 2),

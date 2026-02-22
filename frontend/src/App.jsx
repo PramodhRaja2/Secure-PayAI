@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useBiometrics } from './hooks/useBiometrics';
@@ -35,6 +35,31 @@ const ICON_MAP = {
     'building': Building, 'bar-chart': BarChart3,
 };
 const getIcon = (name, size = 16) => { const I = ICON_MAP[name]; return I ? <I size={size} /> : <Activity size={size} />; };
+
+/* ─────────── DECRYPTED TEXT COMPONENT ─────────── */
+const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+const DecryptedText = ({ text, speed = 50, className = '' }) => {
+    const [displayed, setDisplayed] = useState('');
+    const resolved = useRef(0);
+    useEffect(() => {
+        resolved.current = 0;
+        setDisplayed(text.split('').map(() => CHARS[Math.floor(Math.random() * CHARS.length)]).join(''));
+        const interval = setInterval(() => {
+            resolved.current++;
+            if (resolved.current >= text.length) { setDisplayed(text); clearInterval(interval); return; }
+            setDisplayed(prev =>
+                text.split('').map((ch, i) => i < resolved.current ? ch : CHARS[Math.floor(Math.random() * CHARS.length)]).join('')
+            );
+        }, speed);
+        return () => clearInterval(interval);
+    }, [text, speed]);
+    return <span className={className} style={{ fontFamily: "'JetBrains Mono', monospace", letterSpacing: '-0.01em' }}>{displayed}</span>;
+};
+
+/* ─────────── SHINY TEXT COMPONENT ─────────── */
+const ShinyText = ({ children, className = '', variant = 'default' }) => (
+    <span className={`${variant === 'emerald' ? 'shiny-text-emerald' : 'shiny-text'} ${className}`}>{children}</span>
+);
 
 const RiskGauge = ({ score, level }) => {
     const radius = 80;
@@ -379,6 +404,31 @@ const AdminStats = ({ token }) => {
     );
 };
 
+/* ─────────── CACHE HEALTH INDICATOR ─────────── */
+const CacheHealthIndicator = () => {
+    const [cacheStatus, setCacheStatus] = useState(null);
+    useEffect(() => {
+        const check = async () => {
+            try {
+                const resp = await API.get('/');
+                const entries = resp.data?.cache_status || [];
+                setCacheStatus(entries.length === 0 ? 'empty' : entries.some(e => e.stale) ? 'stale' : 'fresh');
+            } catch { setCacheStatus('error'); }
+        };
+        check();
+        const interval = setInterval(check, 5 * 60 * 1000); // re-check every 5 min
+        return () => clearInterval(interval);
+    }, []);
+    const label = cacheStatus === 'fresh' ? 'FX Rates Live' : cacheStatus === 'stale' ? 'Rates Stale' : cacheStatus === 'empty' ? 'No Cache' : 'Offline';
+    const dotClass = cacheStatus === 'fresh' ? 'fresh' : cacheStatus === 'stale' || cacheStatus === 'empty' ? 'stale' : 'error';
+    return (
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200" style={{ fontSize: 10 }}>
+            <span className={`cache-dot ${dotClass}`} />
+            <span className="opacity-50 uppercase font-bold tracking-wider">{label}</span>
+        </div>
+    );
+};
+
 /* ─────────── MAIN APP ─────────── */
 const App = () => {
     const [txnData, setTxnData] = useState({ amount: 25000, base_currency: 'USD', target_currency: 'EUR', priority: 'balanced' });
@@ -604,8 +654,8 @@ const App = () => {
                         <div className="grid-4 mb-8">
                             <div className="stat-card"><div className="label">Interbank Mid-Rate</div><div className="value">{analysis.fx_report.mid_rate.toFixed(4)}</div></div>
                             <div className="stat-card"><div className="label">Route Net Cost</div><div className="value">${selectedProvider?.total_cost_usd.toFixed(2)}</div></div>
-                            <div className="stat-card"><div className="label">AI Yield Savings</div><div className="value" style={{ color: 'var(--accent-emerald)' }}>+${analysis.total_savings.toFixed(2)}</div></div>
-                            <div className="stat-card"><div className="label">Unified Risk</div><div className={`value ${recommendationColorClass(analysis.risk_report.recommendation_color)}`}>{analysis.risk_report.risk_score}</div></div>
+                            <div className="stat-card"><div className="label">AI Yield Savings</div><div className="value"><ShinyText variant="emerald">+${analysis.total_savings.toFixed(2)}</ShinyText></div></div>
+                            <div className="stat-card"><div className="label">Unified Risk</div><div className={`value ${recommendationColorClass(analysis.risk_report.recommendation_color)}`}><ShinyText>{analysis.risk_report.risk_score}</ShinyText></div></div>
                         </div>
 
                         <div className="grid-2 mb-8">
@@ -696,20 +746,30 @@ const App = () => {
                             <div className="card-header"><h3>Behavioral Audit</h3></div>
                             <div className="card-body">
                                 {analysis.risk_report.breakdown.map((f, i) => (
-                                    <div key={i} className="risk-factor">
+                                    <motion.div
+                                        key={i}
+                                        className="risk-factor"
+                                        initial={{ opacity: 0, x: -16 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: i * 0.08, duration: 0.35, ease: 'easeOut' }}
+                                    >
                                         <div className={`factor-icon ${f.status}`}>{getIcon(f.icon)}</div>
                                         <div className="factor-info">
                                             <div className="factor-name">{f.factor}</div>
                                             <div className="factor-detail">Baseline Ref: {f.baseline} → Capture: {f.current}</div>
                                             <div className="flex items-center gap-2 mt-2">
-                                                <div className="h-1.5 bg-slate-100 flex-1 rounded-full overflow-hidden">
-                                                    <div className={`h-full rounded-full ${f.status === 'high' ? 'bg-red-400' : f.status === 'medium' ? 'bg-amber-400' : 'bg-emerald-400'}`}
-                                                        style={{ width: `${Math.min(f.risk_contribution * 2, 100)}%` }} />
+                                                <div className="h-1.5 bg-slate-100 flex-1 rounded-full overflow-hidden shimmer-bar">
+                                                    <motion.div
+                                                        className={`h-full rounded-full ${f.status === 'critical' ? 'bg-red-400' : f.status === 'warning' ? 'bg-amber-400' : 'bg-emerald-400'}`}
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${f.risk_contribution === 0 ? 100 : Math.min(f.risk_contribution * 2, 100)}%` }}
+                                                        transition={{ delay: i * 0.08 + 0.2, duration: 0.6, ease: 'easeOut' }}
+                                                    />
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="factor-score self-start pt-1">+{f.risk_contribution}</div>
-                                    </div>
+                                        <div className={`factor-score self-start pt-1 ${f.status === 'normal' ? 'text-emerald-500' : ''}`}>+{f.risk_contribution}</div>
+                                    </motion.div>
                                 ))}
                             </div>
                         </div>
@@ -848,10 +908,10 @@ const App = () => {
                         <div className="card-body">
                             <div className="p-6 bg-slate-900 rounded-2xl font-mono text-xs text-emerald-400">
                                 [FINGERPRINT_HASH: 0x82...FA21]<br />
-                                TYPING_SPEED_AVG: 62 WPM<br />
-                                MOUSE_VELOCITY_MEAN: 450 PX/S<br />
+                                TYPING_SPEED_AVG: {analysis?.risk_report?.baseline_profile?.typing_speed || 62} WPM<br />
+                                MOUSE_VELOCITY_MEAN: {analysis?.risk_report?.baseline_profile?.mouse_velocity || 450} PX/S<br />
                                 DEVICE_TRUST_VER: v2.0.4-SIGNED<br />
-                                PRIMARY_REGION: {user.region || 'NORTH_AMERICA_EAST'}
+                                PRIMARY_REGION: {analysis?.risk_report?.baseline_profile?.ip_location || user.region || 'NORTH_AMERICA_EAST'}
                             </div>
                         </div>
                     </div>
@@ -859,8 +919,8 @@ const App = () => {
                         <div className="card-header"><h3>Current Live Signature</h3></div>
                         <div className="card-body">
                             <div className="grid-2 gap-4">
-                                <div className="stat-card"><div className="label">Active Typing</div><div className="value">{biometrics.typing_speed}</div></div>
-                                <div className="stat-card"><div className="label">active Mouse</div><div className="value">{biometrics.mouse_velocity}</div></div>
+                                <div className="stat-card"><div className="label">Active Typing</div><div className="value">{biometrics.typing_speed} WPM</div></div>
+                                <div className="stat-card"><div className="label">Active Mouse</div><div className="value">{biometrics.mouse_velocity} px/s</div></div>
                             </div>
                         </div>
                     </div>
@@ -991,6 +1051,7 @@ const App = () => {
                                 <div className="text-[9px] opacity-40 uppercase font-bold">{user.role}</div>
                             </div>
                         </div>
+                        <CacheHealthIndicator />
                     </div>
                 </div>
 
