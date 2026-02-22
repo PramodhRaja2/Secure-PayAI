@@ -1172,14 +1172,14 @@ const AlertList = ({ user, token, messages, setMessages }) => {
         <div className="animate-in-up space-y-6">
             <div className="card">
                 <div className="card-header flex justify-between items-center">
-                    <h3>{isAdmin ? 'Admin Support Hub' : 'Secure Support Chat'}</h3>
+                    <h3>Report an Issue</h3>
                     <div className="flex items-center gap-2 text-[10px] font-bold text-blue-500 uppercase">
                         <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                        Live with {isAdmin ? 'Users' : 'Support'}
+                        Secure Channel to DevOps
                     </div>
                 </div>
-                <div className="card-body p-0 overflow-hidden rounded-b-2xl">
-                    <ChatInterface user={user} token={token} messages={messages} setMessages={setMessages} isAdmin={isAdmin} />
+                <div className="card-body">
+                    <ReportForm user={user} token={token} />
                 </div>
             </div>
 
@@ -1207,140 +1207,58 @@ const AlertList = ({ user, token, messages, setMessages }) => {
 };
 
 
-/* ─────────── CHAT INTERFACE ─────────── */
-const ChatInterface = ({ user, token, messages, setMessages, isAdmin = false }) => {
-    const [msgText, setMsgText] = useState('');
-    const [selectedUser, setSelectedUser] = useState(null);
-    const [allUsers, setAllUsers] = useState([]);
-    const messagesEndRef = useRef(null);
+/* ─────────── REPORT ISSUE COMPONENT ─────────── */
+const ReportForm = ({ user, token }) => {
+    const [reportText, setReportText] = useState('');
+    const [status, setStatus] = useState('idle'); // idle, sending, success, error
 
-    const getLastMessage = useCallback((userId) => {
-        const userMsgs = messages.filter(m => m.user_id === userId || m.from_user_id === userId);
-        return userMsgs.length > 0 ? userMsgs[0] : null;
-    }, [messages]);
-
-    const sortedUsers = [...allUsers].sort((a, b) => {
-        const msgA = getLastMessage(a.id);
-        const msgB = getLastMessage(b.id);
-        if (!msgA && !msgB) return 0;
-        if (!msgA) return 1;
-        if (!msgB) return -1;
-        return new Date(msgB.time) - new Date(msgA.time);
-    });
-
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
-
-    useEffect(() => {
-        if (isAdmin) {
-            API.get('/dev/users', { headers: { Authorization: token } })
-                .then(res => setAllUsers(res.data.filter(u => u.role !== 'admin')))
-                .catch(console.error);
-        }
-    }, [isAdmin, token]);
-
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
-
-    const handleSend = async (e) => {
+    const handleReport = async (e) => {
         e.preventDefault();
-        if (!msgText.trim()) return;
-        if (isAdmin && !selectedUser) return;
+        if (!reportText.trim()) return;
+        setStatus('sending');
 
         try {
-            const payload = isAdmin
-                ? { user_id: selectedUser.id, message: msgText }
-                : { message: msgText };
-
-            const endpoint = isAdmin ? '/admin/alerts' : '/user/message';
-            await API.post(endpoint, payload, { headers: { Authorization: token } });
-
-            // Add to local state immediately for better UX
-            const newMsg = {
-                id: Date.now(),
-                from_username: user.username,
-                message: msgText,
-                time: new Date().toISOString(),
-                user_id: isAdmin ? selectedUser.id : user.id,
-                from_user_id: user.id
-            };
-            setMessages(prev => [newMsg, ...prev]);
-            setMsgText('');
-        } catch (e) { console.error(e); }
+            await API.post('/user/message', { message: reportText }, { headers: { Authorization: token } });
+            setStatus('success');
+            setReportText('');
+            setTimeout(() => setStatus('idle'), 3000);
+        } catch (e) {
+            console.error(e);
+            setStatus('error');
+            setTimeout(() => setStatus('idle'), 3000);
+        }
     };
 
-    const filteredMessages = isAdmin
-        ? messages.filter(m => m.user_id === selectedUser?.id || m.from_user_id === selectedUser?.id)
-        : messages;
-
     return (
-        <div className="chat-container">
-            {isAdmin && (
-                <div className="chat-sidebar">
-                    <div className="p-4 font-bold border-bottom text-slate-500 text-[10px] uppercase tracking-wider">Conversations</div>
-                    <div className="overflow-y-auto flex-1">
-                        {sortedUsers.map(u => {
-                            const lastMsg = getLastMessage(u.id);
-                            return (
-                                <div
-                                    key={u.id}
-                                    className={`chat-user-item ${selectedUser?.id === u.id ? 'active' : ''}`}
-                                    onClick={() => setSelectedUser(u)}
-                                >
-                                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-500 font-bold shrink-0">
-                                        {u.username[0].toUpperCase()}
-                                    </div>
-                                    <div className="flex-1 min-w-0 overflow-hidden">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <div className="font-bold text-sm truncate">{u.username}</div>
-                                            {lastMsg && <div className="text-[9px] opacity-40 shrink-0">{new Date(lastMsg.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>}
-                                        </div>
-                                        <div className="text-[10px] text-slate-500 truncate">
-                                            {lastMsg ? (lastMsg.from_username === user.username ? `You: ${lastMsg.message}` : lastMsg.message) : 'Secure Line Active'}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+            <p className="text-xs text-slate-500 mb-4">
+                Use this secure channel to report bugs, anomalies, or compliance violations directly to the DevOps Kernel.
+                Reports are encrypted and logged instantly.
+            </p>
+            <form onSubmit={handleReport} className="space-y-3">
+                <textarea
+                    className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm focus:border-blue-500 outline-none resize-none h-24"
+                    placeholder="Describe the issue in detail..."
+                    value={reportText}
+                    onChange={(e) => setReportText(e.target.value)}
+                    disabled={status === 'sending' || status === 'success'}
+                />
+                <div className="flex justify-between items-center">
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                        {status === 'success' && <span className="text-emerald-500">✔ Report Transmitted Successfully</span>}
+                        {status === 'error' && <span className="text-red-500">❌ Transmission Failed</span>}
+                        {status === 'sending' && <span className="text-blue-500 animate-pulse">Transmitting...</span>}
                     </div>
+                    <button
+                        type="submit"
+                        disabled={!reportText.trim() || status === 'sending' || status === 'success'}
+                        className="btn-primary flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
+                    >
+                        {status === 'sending' ? <Activity size={16} className="animate-spin" /> : <Send size={16} />}
+                        Submit Report
+                    </button>
                 </div>
-            )}
-
-            <div className="chat-main">
-                <div className="chat-messages">
-                    {isAdmin && !selectedUser ? (
-                        <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
-                            Select a user to begin transmission
-                        </div>
-                    ) : (
-                        <>
-                            {filteredMessages.slice().reverse().map((m, i) => (
-                                <div key={m.id || i} className={`message-bubble ${m.from_username === user.username ? 'message-sent' : 'message-received'}`}>
-                                    <div>{m.message}</div>
-                                    <span className="message-time">{new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                </div>
-                            ))}
-                            <div ref={messagesEndRef} />
-                        </>
-                    )}
-                </div>
-
-                {(!isAdmin || selectedUser) && (
-                    <form onSubmit={handleSend} className="chat-input-area">
-                        <input
-                            type="text"
-                            placeholder="Type a message..."
-                            value={msgText}
-                            onChange={(e) => setMsgText(e.target.value)}
-                        />
-                        <button type="submit" className="chat-send-btn">
-                            <Send size={18} />
-                        </button>
-                    </form>
-                )}
-            </div>
+            </form>
         </div>
     );
 };

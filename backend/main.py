@@ -202,13 +202,13 @@ async def update_preferences(req: PreferenceRequest):
 async def send_user_message(payload: dict):
     # payload: { user_id, username, message }
     db = SessionLocal()
-    # Find admin user to be the recipient
-    admin = db.query(UserProfile).filter(UserProfile.role == "admin").first()
-    if not admin:
+    # Find dev user to be the recipient of reports
+    dev = db.query(UserProfile).filter(UserProfile.role == "dev").first()
+    if not dev:
         db.close()
-        raise HTTPException(status_code=404, detail="No admin found")
+        raise HTTPException(status_code=404, detail="No DevOps found")
     new_msg = Alert(
-        user_id=admin.id,
+        user_id=dev.id,
         from_user_id=payload.get("user_id"),
         from_username=payload.get("username"),
         type="user_message",
@@ -217,7 +217,7 @@ async def send_user_message(payload: dict):
     db.add(new_msg)
     db.commit()
     
-    # Real-time broadcast to admin
+    # Real-time broadcast to dev
     msg_data = {
         "id": new_msg.id,
         "user_id": new_msg.user_id,
@@ -227,7 +227,7 @@ async def send_user_message(payload: dict):
         "message": new_msg.message,
         "time": new_msg.time
     }
-    await manager.send_personal_message(msg_data, admin.id)
+    await manager.send_personal_message(msg_data, dev.id)
     
     db.close()
     return {"status": "sent"}
