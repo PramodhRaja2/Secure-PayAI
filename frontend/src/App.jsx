@@ -767,7 +767,7 @@ const App = () => {
                     <div className="login-header">
                         <Activity color="#4f7df9" size={40} className="mx-auto" />
                         <h2>{isRegistering ? 'Create Profile' : 'SecurePay AI v4.0'}</h2>
-                        <div className="text-lg font-black text-blue-500 my-2 uppercase tracking-tighter">Built By Pramodh Raja</div>
+                        <div className="text-3xl font-black text-blue-500 my-4 uppercase tracking-tighter">Built By Pramodh Raja</div>
                         <p className="text-[10px] opacity-70 mb-4">{isRegistering ? 'Enterprise Identity Enrollment' : 'Identity & Specialized Governance Portal'}</p>
                         <div className="text-[9px] font-bold text-slate-400 bg-slate-50 py-2 px-3 rounded-lg border border-slate-100 mb-4">
                             Developed at <a href="https://www.bapssathy.ac.in/index.php" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Bannari Amman Public School</a>
@@ -821,7 +821,7 @@ const App = () => {
                 <div className="sidebar-logo">
                     <div className="logo-icon"><Shield size={20} /></div>
                     <h1>SecurePay AI</h1>
-                    <div className="text-[11px] font-black text-blue-600 absolute top-[44px] left-[68px] uppercase tracking-widest">Pramodh Raja</div>
+                    <div className="text-[13px] font-black text-blue-600 absolute top-[44px] left-[68px] uppercase tracking-widest bg-white/80 backdrop-blur-sm px-1 rounded-sm">Pramodh Raja</div>
                 </div>
 
                 <div className="px-6 py-4 mb-4">

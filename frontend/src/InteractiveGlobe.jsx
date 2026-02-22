@@ -15,19 +15,21 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
         dest: null,
         pathProgress: 0,
         pulseRadius: 0,
-        // Interaction state
         isDragging: false,
         dragStart: null,
         rotationStart: null,
         scale: 1,
-        lastInteraction: 0, // timestamp of last user interaction
-        idleTimeout: 3000,  // ms before auto-spin resumes
+        lastInteraction: 0,
+        idleTimeout: 3000,
+        globeColor: globeColor || '#10b981',
+        speed: speed || 0.5,
+        locked: locked ?? true
     });
 
     // Sync props to ref
     useEffect(() => {
-        // Reset animation progress if routing starts or if the cities change
-        if (!isRouting || stateRef.current.source?.id !== source?.id || stateRef.current.dest?.id !== dest?.id) {
+        // Reset animation progress ONLY if the route actually changes
+        if (isRouting && (stateRef.current.source?.id !== source?.id || stateRef.current.dest?.id !== dest?.id)) {
             stateRef.current.pathProgress = 0;
         }
 
@@ -35,7 +37,9 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
         stateRef.current.source = source;
         stateRef.current.dest = dest;
         stateRef.current.locked = locked;
-    }, [isRouting, source, dest, locked]);
+        stateRef.current.globeColor = globeColor;
+        stateRef.current.speed = speed;
+    }, [isRouting, source, dest, locked, globeColor, speed]);
 
     useEffect(() => {
         // Load map data once
@@ -127,16 +131,13 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
             const cityPins = svg.select(".city-pins");
 
             const render = (time) => {
-                const dt = time - lastTime;
+                const dt = Math.min(time - lastTime, 100); // Clamp jumpy frames
                 lastTime = time;
 
                 const s = stateRef.current;
-                const isIdle = !s.isDragging && (time - s.lastInteraction > s.idleTimeout);
+                const isIdle = !s.isDragging && (performance.now() - s.lastInteraction > s.idleTimeout);
 
-                // Apply zoom
                 projection.scale(baseRadius * s.scale);
-
-                // Update shadow circle size for zoom
                 globeOceanShadow
                     .attr("cx", width / 2)
                     .attr("cy", height / 2)
@@ -144,45 +145,34 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
 
                 if (!s.isDragging) {
                     if (s.locked && s.routingActive && s.source && s.dest) {
-                        // LOCKED: smoothly orient to the route midpoint
                         const interpolate = d3.geoInterpolate(
                             [Number(s.source.lng), Number(s.source.lat)],
                             [Number(s.dest.lng), Number(s.dest.lat)]
                         );
                         const mid = interpolate(0.5);
                         const target = [-mid[0], -mid[1], 0];
-
                         s.rotation[0] += (target[0] - s.rotation[0]) * 0.05;
                         s.rotation[1] += (target[1] - s.rotation[1]) * 0.05;
-
-                        // Animate path progress
-                        if (s.pathProgress < 1) {
-                            s.pathProgress += 0.015 * (dt / 16);
-                            if (s.pathProgress > 1) s.pathProgress = 1;
-                        }
                     } else if (isIdle) {
-                        // FREE or no route: auto-spin when idle
-                        s.rotation[0] += speed * (dt / 16);
+                        s.rotation[0] += s.speed * (dt / 16);
                     }
+                }
 
-                    // Always animate path progress even if unlocked
-                    if (!s.locked && s.routingActive && s.pathProgress < 1) {
-                        s.pathProgress += 0.015 * (dt / 16);
-                        if (s.pathProgress > 1) s.pathProgress = 1;
-                    }
+                // Global Path Animation
+                if (s.routingActive && s.pathProgress < 1) {
+                    s.pathProgress += 0.015 * (dt / 16);
+                    if (s.pathProgress > 1) s.pathProgress = 1;
                 }
 
                 projection.rotate(s.rotation);
                 s.pulseRadius = (s.pulseRadius + 0.5 * (dt / 16)) % 20;
 
-                // Draw Base Map
                 if (dataRef.current) {
                     globeOcean.attr("d", path(sphere));
                     globeLand.attr("d", path(dataRef.current.land));
                     globeBorders.attr("d", path(dataRef.current.borders));
                 }
 
-                // Draw Route Line
                 if (s.routingActive && s.source && s.dest) {
                     const routeGeo = {
                         type: "LineString",
@@ -191,13 +181,12 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
                             [Number(s.dest.lng), Number(s.dest.lat)]
                         ]
                     };
-
                     const d = path(routeGeo);
                     routeLine.attr("d", d);
-
                     if (d) {
                         const length = routeLine.node()?.getTotalLength() || 0;
                         routeLine
+                            .attr("stroke", s.globeColor) // Sync color
                             .attr("stroke-dasharray", length)
                             .attr("stroke-dashoffset", length * (1 - s.pathProgress));
                     }
@@ -205,7 +194,6 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
                     routeLine.attr("d", "");
                 }
 
-                // Draw Pins
                 const pinsData = (cities || []).map((c) => {
                     const coords = [Number(c.lng), Number(c.lat)];
                     const isVisible = path({ type: "Point", coordinates: coords }) !== null;
@@ -214,45 +202,25 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
                 });
 
                 const circles = cityPins.selectAll("g.pin-group").data(pinsData, (d) => d.id);
-
-                const enter = circles.enter().append("g")
-                    .attr("class", "pin-group");
-
-                enter.append("circle")
-                    .attr("class", "pin-core")
-                    .attr("r", 3)
-                    .attr("fill", "#64748b");
-
-                enter.append("circle")
-                    .attr("class", "pin-pulse")
-                    .attr("fill", "none")
-                    .attr("stroke", "#64748b")
-                    .attr("stroke-width", 1);
+                const enter = circles.enter().append("g").attr("class", "pin-group");
+                enter.append("circle").attr("class", "pin-core").attr("r", 3).attr("fill", "#64748b");
+                enter.append("circle").attr("class", "pin-pulse").attr("fill", "none").attr("stroke", "#64748b").attr("stroke-width", 1);
 
                 const update = enter.merge(circles);
+                update.attr("transform", d => d.pos ? `translate(${d.pos[0]},${d.pos[1]})` : "translate(-100,-100)").style("opacity", d => d.isVisible ? 1 : 0);
 
-                update
-                    .attr("transform", d => d.pos ? `translate(${d.pos[0]},${d.pos[1]})` : "translate(-100,-100)")
-                    .style("opacity", d => d.isVisible ? 1 : 0);
-
-                // Highlight active source/dest
                 update.select(".pin-core")
-                    .attr("fill", d => (s.routingActive && (d.id === s.source?.id || d.id === s.dest?.id)) ? globeColor : "#64748b")
+                    .attr("fill", d => (s.routingActive && (d.id === s.source?.id || d.id === s.dest?.id)) ? s.globeColor : "#64748b")
                     .attr("r", d => (s.routingActive && (d.id === s.source?.id || d.id === s.dest?.id)) ? 5 : 3);
 
                 update.select(".pin-pulse")
                     .attr("r", d => (s.routingActive && (d.id === s.source?.id || d.id === s.dest?.id)) ? s.pulseRadius : 0)
-                    .attr("stroke", globeColor)
+                    .attr("stroke", s.globeColor)
                     .style("opacity", d => (s.routingActive && (d.id === s.source?.id || d.id === s.dest?.id)) ? 1 - (s.pulseRadius / 20) : 0);
 
-                update
-                    .style("cursor", "pointer")
-                    .on("click", (event, d) => {
-                        if (onCityClick) onCityClick(d);
-                    })
-                    .on("mouseover", function () {
-                        d3.select(this).select(".pin-core").attr("r", 7);
-                    })
+                update.style("cursor", "pointer")
+                    .on("click", (event, d) => { if (onCityClick) onCityClick(d); })
+                    .on("mouseover", function () { d3.select(this).select(".pin-core").attr("r", 7); })
                     .on("mouseout", function (event, d) {
                         const isMain = s.routingActive && (d.id === s.source?.id || d.id === s.dest?.id);
                         d3.select(this).select(".pin-core").attr("r", isMain ? 5 : 3);
@@ -272,7 +240,7 @@ export default function InteractiveGlobe({ cities, source, dest, isRouting, glob
             svgNode.removeEventListener('pointerleave', onPointerUp);
             svgNode.removeEventListener('wheel', onWheel);
         };
-    }, [cities, globeColor, speed]);
+    }, [cities]); // Loop ONLY restarts if cities list changes (rare)
 
     return (
         <div ref={containerRef} className="w-full h-full">
