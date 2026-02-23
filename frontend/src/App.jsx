@@ -18,6 +18,7 @@ import AIAdvisor from './AIAdvisor';
 import { GLOBAL_CITIES } from './citiesData';
 import ThreatMap from './ThreatMap';
 import API from './api';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler);
@@ -134,7 +135,7 @@ const AdminStats = ({ token }) => {
     );
 };
 
-/* ─────────── CACHE HEALTH INDICATOR ─────────── */
+/* ─────────��─ CACHE HEALTH INDICATOR ─────────── */
 const CacheHealthIndicator = () => {
     const [cacheStatus, setCacheStatus] = useState(null);
     useEffect(() => {
@@ -1488,6 +1489,7 @@ const UserManagement = ({ token, user }) => {
                     </motion.div>
                 )}
             </AnimatePresence>
+            <SpeedInsights />
         </div>
     );
 };
