@@ -19,11 +19,18 @@
     --accent-blue: #3b82f6;
     --accent-cyan: #06b6d4;
     --accent-emerald: #10b981;
-    --accent-purple: #8b5cf6;
     --accent-amber: #f59e0b;
     --accent-red: #ef4444;
     --accent-orange: #f97316;
-    --gradient-blue: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+
+    /* Terminal Theme Tokens */
+    --terminal-bg: #050505;
+    --terminal-green: #00ff41;
+    --terminal-dim: #003b00;
+    --terminal-border: rgba(0, 255, 65, 0.2);
+    --terminal-text: #00ff41;
+
+    --gradient-blue: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.4) 100%);
     --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
     --shadow-md: 0 4px 12px -1px rgba(0, 0, 0, 0.06), 0 2px 6px -2px rgba(0, 0, 0, 0.04);
@@ -1188,6 +1195,61 @@ body {
 
     to {
         transform: rotate(360deg);
+    }
+}
+
+/* ─────────── MOBILE RESPONSIVENESS ─────────── */
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        left: -100%;
+        top: 0;
+        bottom: 0;
+        z-index: 1000;
+        transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        width: 280px !important;
+        box-shadow: 20px 0 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .sidebar.open {
+        left: 0;
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+        padding: 16px !important;
+    }
+
+    .mobile-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+        z-index: 999;
+    }
+
+    .grid-cols-2,
+    .grid-cols-3,
+    .grid-cols-4 {
+        grid-template-columns: 1fr !important;
+    }
+
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .chat-container {
+        flex-direction: column;
+        height: 700px;
+    }
+
+    .chat-sidebar {
+        width: 100%;
+        height: 150px;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
     }
 }
 

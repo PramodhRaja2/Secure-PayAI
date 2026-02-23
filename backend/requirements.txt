@@ -6,7 +6,10 @@ pydantic
 python-multipart
 passlib
 bcrypt
+openai
+anthropic
 google-generativeai
 python-dotenv
 sqlalchemy
 psycopg2-binary
+httpx

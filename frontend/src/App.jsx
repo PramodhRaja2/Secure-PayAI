@@ -171,6 +171,7 @@ const App = () => {
     const [selectedProvider, setSelectedProvider] = useState(null);
     const [apiError, setApiError] = useState(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [wsConnected, setWsConnected] = useState(false);
     const [messages, setMessages] = useState([]);
 
@@ -750,6 +751,7 @@ const App = () => {
     const handleNav = (id) => {
         setActiveNav(id);
         setSidebarOpen(false);
+        setIsMobileMenuOpen(false);
     };
 
     const [isRegistering, setIsRegistering] = useState(false);
@@ -824,8 +826,10 @@ const App = () => {
 
     return (
         <div className="app-layout">
-            <div className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
-            <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+            {(sidebarOpen || isMobileMenuOpen) && (
+                <div className="mobile-overlay md:hidden" onClick={() => { setSidebarOpen(false); setIsMobileMenuOpen(false); }} aria-hidden="true" />
+            )}
+            <aside className={`sidebar ${(sidebarOpen || isMobileMenuOpen) ? 'open' : ''}`}>
                 <div className="sidebar-logo">
                     <div className="logo-icon"><Shield size={20} /></div>
                     <h1>SecurePay AI</h1>
@@ -887,7 +891,8 @@ const App = () => {
             <main className="main-content">
                 <div className="page-header">
                     <div className="page-header-left">
-                        <button type="button" className="menu-toggle" onClick={() => setSidebarOpen(true)} aria-label="Open menu"><Menu size={24} /></button>
+                        <button type="button" className="md:hidden p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors mr-2" onClick={() => setIsMobileMenuOpen(true)} title="Open Menu"><Menu size={20} /></button>
+                        <button type="button" className="menu-toggle hidden md:flex" onClick={() => setSidebarOpen(true)} aria-label="Open menu"><Menu size={24} /></button>
                         <div>
                             <h2 className="text-3xl font-black">{meta.title}</h2>
                             <p className="font-semibold opacity-70">{meta.desc}</p>
@@ -1054,54 +1059,56 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
     };
 
     return (
-        <div className="card border-blue-500/30 overflow-hidden shadow-2xl shadow-blue-500/10">
-            <div className="card-header bg-slate-900 border-b border-blue-500/20 flex justify-between items-center py-4 px-6">
+        <div className="card rounded-none overflow-hidden border-none shadow-none bg-black">
+            <div className="bg-black border-b border-[#00ff41]/30 flex justify-between items-center py-3 px-6">
                 <div className="flex items-center gap-3">
-                    <div className="bg-blue-500 p-2 rounded-lg text-white shadow-lg shadow-blue-500/30"><Cpu size={18} /></div>
+                    <div className="text-[#00ff41]"><Cpu size={18} /></div>
                     <div>
-                        <h3 className="text-white font-black tracking-tight">Security Terminal</h3>
-                        <div className="text-[10px] text-blue-400 font-bold uppercase tracking-widest opacity-70">DevOps Workspace</div>
+                        <h3 className="text-[#00ff41] font-mono font-bold uppercase tracking-tight text-xs">DevOps Security Terminal</h3>
+                        <div className="text-[9px] text-[#00ff41]/50 font-mono uppercase tracking-[0.3em] font-black">Secure Shell V4.5</div>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[10px] text-white/50 font-bold uppercase tracking-tighter">API V4.5_STABLE</span>
-                    </div>
-                    <button onClick={onLogout} className="text-red-400 hover:text-red-300 transition-colors p-1" title="Kill Session"><X size={18} /></button>
+                    <button
+                        onClick={toggleTheme}
+                        className="text-[#00ff41] border border-[#00ff41]/20 px-2 py-1 rounded font-mono text-[9px] hover:bg-[#00ff41]/10 transition-all uppercase"
+                    >
+                        [ {darkMode ? 'Switch::Light' : 'Switch::Dark'} ]
+                    </button>
+                    <button onClick={onLogout} className="text-red-500 hover:text-red-400 font-mono text-xs font-bold" title="Kill Session">[ DISCONNECT ]</button>
                 </div>
             </div>
 
-            <div className="p-1 bg-slate-800/50 flex border-b border-blue-500/10">
+            <div className="flex bg-[#001400] border-b border-[#00ff41]/10">
                 {['overview', 'pending', 'comms', 'wipe'].map(t => (
                     <button
                         key={t}
                         onClick={() => setActiveTab(t)}
-                        className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest transition-all ${activeTab === t ? 'text-white bg-blue-600 shadow-inner' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}`}
+                        className={`flex-1 py-2 text-[10px] font-mono uppercase tracking-widest transition-all ${activeTab === t ? 'text-black bg-[#00ff41] font-black' : 'text-[#00ff41]/40 hover:text-[#00ff41] hover:bg-[#00ff41]/5'}`}
                     >
                         {t}
                     </button>
                 ))}
             </div>
 
-            <div className="card-body bg-slate-950 min-h-[500px] p-6 text-slate-300 font-mono text-sm relative">
+            <div className="card-body bg-black min-h-[500px] p-6 text-[#00ff41] font-mono text-xs relative">
                 {activeTab === 'overview' && (
                     <div className="space-y-6 animate-in">
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="stats-mini border-slate-800 bg-slate-900/50">
-                                <span className="label">Total TXNs</span>
-                                <span className="value text-white">{stats?.total_transactions || 0}</span>
+                            <div className="p-3 border border-[#00ff41]/20 bg-[#001400]">
+                                <span className="block text-[10px] opacity-50 uppercase mb-1">Total_Transactions</span>
+                                <span className="text-xl text-[#00ff41] font-black">{stats?.total_transactions || 0}</span>
                             </div>
-                            <div className="stats-mini border-slate-800 bg-slate-900/50">
-                                <span className="label">Pending</span>
-                                <span className="value text-amber-400">{stats?.pending || 0}</span>
+                            <div className="p-3 border border-orange-500/20 bg-orange-950/20">
+                                <span className="block text-[10px] text-orange-500/70 uppercase mb-1">Queue_Pending</span>
+                                <span className="text-xl text-orange-500 font-black">{stats?.pending || 0}</span>
                             </div>
                         </div>
-                        <div className="space-y-2 border-l-2 border-slate-800 pl-4 py-1">
-                            {['Kernel', 'FX Service', 'Biometrics', 'DB_Sync'].map(s => (
-                                <div key={s} className="flex justify-between items-center text-[10px]">
-                                    <span className="opacity-50">{s}::Status</span>
-                                    <span className="text-emerald-500 font-bold">READY</span>
+                        <div className="space-y-1 py-2 opacity-60">
+                            {['Kernel', 'FX_Service', 'Biometrics', 'DB_Socket'].map(s => (
+                                <div key={s} className="flex justify-between items-center text-[9px]">
+                                    <span>{s}::LINK_STATE</span>
+                                    <span className="text-[#00ff41]">STABLE</span>
                                 </div>
                             ))}
                         </div>
@@ -1111,22 +1118,22 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
                 {activeTab === 'pending' && (
                     <div className="space-y-4 animate-in">
                         {pending.length === 0 ? (
-                            <div className="text-center py-20 opacity-20">NO PENDING_TXNS IN BUFFER</div>
+                            <div className="text-center py-20 opacity-20">NO_DATA_STREAM::PENDING_EMPTY</div>
                         ) : (
                             pending.map(t => (
-                                <div key={t.id} className="p-4 bg-slate-900 border border-slate-800 rounded-xl hover:border-blue-500/30 transition-all">
-                                    <div className="flex justify-between text-[11px] mb-3">
-                                        <span className="text-blue-400">TXN_{t.id}</span>
-                                        <span className="opacity-50">{new Date(t.time).toLocaleTimeString()}</span>
+                                <div key={t.id} className="p-4 border border-[#00ff41]/20 bg-[#001400] hover:border-[#00ff41]/40 transition-all group">
+                                    <div className="flex justify-between text-[10px] mb-3">
+                                        <span className="text-[#00ff41] font-black tracking-widest uppercase">TXN_ID_{t.id}</span>
+                                        <span className="opacity-40">{new Date(t.time).toLocaleTimeString()}</span>
                                     </div>
-                                    <div className="text-xl font-bold text-white mb-2">{t.amount} {t.base_currency}</div>
-                                    <div className="text-xs space-y-1 mb-4 opacity-70">
-                                        <div>GEO: {t.location}</div>
-                                        <div>LEVEL: {riskBadge(t.risk_score)} {t.risk_level} ({t.risk_score})</div>
+                                    <div className="text-lg font-black text-white mb-2 leading-none">{t.amount} {t.base_currency} <span className="text-[10px] opacity-40 font-normal">{'->'}</span> {t.target_currency}</div>
+                                    <div className="text-[10px] space-y-1 mb-4 opacity-70">
+                                        <div>LOCATION: {t.location}</div>
+                                        <div>RISK_LVL: {t.risk_level} ({t.risk_score})</div>
                                     </div>
                                     <div className="flex gap-2">
-                                        <button onClick={() => review(t.id, 'approve')} className="flex-1 py-2 bg-emerald-600 text-white text-[10px] font-bold uppercase rounded-lg">Approve</button>
-                                        <button onClick={() => review(t.id, 'deny')} className="flex-1 py-2 bg-red-600 text-white text-[10px] font-bold uppercase rounded-lg">Deny</button>
+                                        <button onClick={() => review(t.id, 'approve')} className="flex-1 py-1.5 border border-[#00ff41] text-[#00ff41] text-[9px] font-black uppercase hover:bg-[#00ff41] hover:text-black transition-all">Approve</button>
+                                        <button onClick={() => review(t.id, 'deny')} className="flex-1 py-1.5 border border-red-500 text-red-500 text-[9px] font-black uppercase hover:bg-red-500 hover:text-black transition-all">Deny</button>
                                     </div>
                                 </div>
                             ))
@@ -1136,65 +1143,64 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
 
                 {activeTab === 'comms' && (
                     <div className="space-y-4 animate-in">
-                        <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2">
-                            <span className="text-[10px] opacity-40 uppercase font-black tracking-widest">Inbound Directives</span>
-                            <button onClick={handleClearComms} className="text-[10px] text-red-500 hover:text-red-400 font-bold uppercase underline">Clear Terminal</button>
+                        <div className="flex justify-between items-center mb-4 border-b border-[#00ff41]/10 pb-2">
+                            <span className="text-[9px] opacity-40 uppercase font-black tracking-[0.2em]">Inbound_Data_Packets</span>
+                            <button onClick={handleClearComms} className="text-[9px] text-red-500 hover:text-red-400 font-black uppercase underline tracking-tighter">[ PURGE_TERMINAL ]</button>
                         </div>
-                        <div className="max-h-[250px] overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-800">
+                        <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-[#00ff41]/20">
                             {messages.length === 0 ? (
-                                <div className="text-center py-10 opacity-20">NO_INBOUND_COMMS</div>
+                                <div className="text-center py-10 opacity-20 uppercase tracking-widest text-[10px]">Ready_For_Transmission</div>
                             ) : (
                                 messages.map(m => (
-                                    <div key={m.id} className={`p-3 border rounded-xl group relative ${m.type === 'security_incident' ? 'bg-red-950/40 border-red-500/30' : 'bg-slate-900 border-slate-800'}`}>
-                                        <div className="flex justify-between text-[9px] mb-1">
-                                            <span className={`${m.type === 'security_incident' ? 'text-red-400' : 'text-blue-400'} font-bold uppercase tracking-tighter`}>
-                                                {m.type === 'security_incident' ? '🚨 SECURITY_INCIDENT' : `Sender: ${m.from_username || 'SYSTEM'}`}
+                                    <div key={m.id} className={`p-4 border group relative ${m.type === 'security_incident' ? 'bg-red-950/20 border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.1)]' : 'bg-[#001400] border-[#00ff41]/10'}`}>
+                                        <div className="flex justify-between text-[8px] mb-2 font-black">
+                                            <span className={`${m.type === 'security_incident' ? 'text-red-500' : 'text-[#00ff41]'} uppercase tracking-widest`}>
+                                                {m.type === 'security_incident' ? '>> SECURITY_ALERT' : `>> SRC: UID_${m.from_username || 'SYS'}`}
                                             </span>
                                             <div className="flex items-center gap-2">
                                                 <span className="opacity-40">{new Date(m.time).toLocaleTimeString()}</span>
                                                 <button
                                                     onClick={() => {
-                                                        if (window.confirm("Delete this log entry?")) {
+                                                        if (window.confirm("Drop packet?")) {
                                                             API.delete(`/alerts/${m.id}`, { headers: { Authorization: token } })
                                                                 .then(() => setMessages(prev => prev.filter(x => x.id !== m.id)))
-                                                                .catch(e => alert(e.response?.data?.detail || "Delete failed"));
                                                         }
                                                     }}
-                                                    className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all"
+                                                    className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all font-mono"
                                                 >
-                                                    <Trash2 size={10} />
+                                                    [DELETE]
                                                 </button>
                                             </div>
                                         </div>
-                                        <p className="text-[11px] opacity-70 leading-tight">{m.message}</p>
+                                        <p className="text-[11px] leading-relaxed opacity-80">{m.message}</p>
                                     </div>
                                 ))
                             )}
                         </div>
-                        <div className="h-[1px] bg-slate-800 mt-6 mb-4" />
+                        <div className="h-[1px] bg-[#00ff41]/10 mt-6 mb-4" />
                         <form onSubmit={handleSendMessage} className="space-y-3">
-                            <div className="text-[10px] opacity-40 uppercase font-black tracking-widest">Transmit Protocol</div>
-                            <div className="flex gap-2">
+                            <div className="text-[9px] opacity-40 uppercase font-black tracking-widest">Transmit_Command_Packet</div>
+                            <div className="flex flex-col sm:flex-row gap-2">
                                 <select
                                     value={targetUser}
                                     onChange={e => setTargetUser(e.target.value)}
-                                    className="bg-slate-900 border border-slate-800 p-2 rounded-lg text-xs outline-none focus:border-blue-500"
+                                    className="bg-black border border-[#00ff41]/30 p-2 text-[10px] text-[#00ff41] outline-none focus:border-[#00ff41]"
                                 >
-                                    <option value="0">ALL_USERS (BROADCAST)</option>
+                                    <option value="0">BROADCAST_ALL</option>
                                     {users.filter(u => u.role !== 'dev').map(u => (
                                         <option key={u.id} value={u.id}>UID_{u.id}: {u.username}</option>
                                     ))}
                                 </select>
-                            </div>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={devMsg}
-                                    onChange={e => setDevMsg(e.target.value)}
-                                    placeholder="COMMAND_PACKET_STRING..."
-                                    className="flex-1 bg-slate-900 border border-slate-800 p-2 rounded-lg text-xs outline-none focus:border-blue-500"
-                                />
-                                <button type="submit" className="bg-blue-600 text-white px-4 rounded-lg hover:bg-blue-500 transition-colors"><Send size={14} /></button>
+                                <div className="flex flex-1 gap-2">
+                                    <input
+                                        type="text"
+                                        value={devMsg}
+                                        onChange={e => setDevMsg(e.target.value)}
+                                        placeholder="ENCODE_MSG..."
+                                        className="flex-1 bg-black border border-[#00ff41]/30 p-2 text-[10px] text-[#00ff41] outline-none focus:border-[#00ff41]"
+                                    />
+                                    <button type="submit" className="bg-[#00ff41] text-black px-4 font-black uppercase text-[10px] hover:bg-white transition-all">Push</button>
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -1202,12 +1208,12 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
 
                 {activeTab === 'wipe' && (
                     <div className="flex flex-col items-center justify-center min-h-[300px] text-center space-y-6 animate-in">
-                        <div className="text-red-500 animate-pulse"><Zap size={48} /></div>
+                        <div className="text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] bg-red-500/10 p-4 rounded-full"><Zap size={48} /></div>
                         <div>
-                            <h4 className="text-white font-black uppercase tracking-widest mb-2">Nuclear Protocol</h4>
-                            <p className="text-[10px] opacity-50 px-8">Executing this will wipe all Transactional and Alert logs from the primary DB cluster. Users and roles are preserved.</p>
+                            <h4 className="text-white font-black uppercase tracking-[0.2em] mb-2 font-mono">NUCLEAR_PURGE_PROTOCOL</h4>
+                            <p className="text-[10px] opacity-60 px-8 font-mono">This command will initiate a full database wipe for transactions and alerts. Proceed with extreme caution.</p>
                         </div>
-                        <button onClick={handleWipeData} className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-tighter rounded-full shadow-lg shadow-red-900/40 transition-all hover:scale-105 active:scale-95">Wipe Data Clusters</button>
+                        <button onClick={handleWipeData} className="px-10 py-3 bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-widest text-[10px] border border-red-400/30 transition-all hover:scale-105">EXECUTE_WIPE</button>
                     </div>
                 )}
             </div>

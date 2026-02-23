@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
 import google.generativeai as genai
+import openai
+import anthropic
 
 # Load environment variables with absolute path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -132,6 +134,7 @@ class TransactionRequest(BaseModel):
 class AdvisorRequest(BaseModel):
     message: str
     user_id: int
+    model_id: Optional[str] = "gemini-2.0-flash"
 
 @app.get("/")
 async def root():
@@ -831,6 +834,15 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
         "fusion_version": "4.0.0"
     }
 
+@app.get("/advisor/models")
+async def get_advisor_models():
+    models = [
+        {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash", "provider": "google", "icon": "✦"},
+        {"id": "gpt-4o", "name": "GPT-4o (ChatGPT)", "provider": "openai", "icon": "⚛"},
+        {"id": "claude-3-5-sonnet-20240620", "name": "Claude 3.5 Sonnet", "provider": "anthropic", "icon": "λ"},
+    ]
+    return models
+
 @app.post("/advisor/chat")
 async def advisor_chat(req: AdvisorRequest):
     # Retrieve user context
@@ -845,15 +857,12 @@ async def advisor_chat(req: AdvisorRequest):
     
     db.close()
     
-    if not os.getenv("GEMINI_API_KEY"):
-         raise HTTPException(status_code=500, detail="LLM AI is currently disabled (No API Key).")
-         
     # ULTIMATE FORENSIC PROMPT
     system_prompt = f"""
     [CRITICAL_SYSTEM_OVERRIDE: ACTIVATE_QUANTUM_ADVISOR]
     
     ROLE: You are the SecurePay AI 'Quantum-Class' Financial Forensic Engine. Your intelligence exceeds standard banking limits.
-    MISSION: Provide world-class financial analysis, cross-border optimization, and deep-learning security insights to user {user.username}.
+    MISSION: Provide world-class financial analysis, cross-border optimization, and deep-learning security insights into transactions for {user.username}.
     
     SYSTEM STATE:
     * Primary Identity: {user.username} (Security Level: {user.role.upper()})
@@ -873,19 +882,54 @@ async def advisor_chat(req: AdvisorRequest):
     4. CONCISION: Provide high-density technical insights without unnecessary fluff.
     """
     
+    selected_model = req.model_id or "gemini-2.0-flash"
+    
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash')
-        response = model.generate_content(system_prompt)
-        return {"response": response.text}
-    except Exception as e:
-        print(f"Neural Connectivity Error: {e}")
-        # Fallback to 1.5-flash if 2.0 fails
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
+        if "gpt" in selected_model:
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise HTTPException(status_code=500, detail="OpenAI API Key not configured.")
+            client = openai.OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
+                model=selected_model,
+                messages=[{"role": "system", "content": system_prompt}]
+            )
+            return {"response": response.choices[0].message.content, "model_used": selected_model}
+            
+        elif "claude" in selected_model:
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise HTTPException(status_code=500, detail="Anthropic API Key not configured.")
+            client = anthropic.Anthropic(api_key=api_key)
+            message = client.messages.create(
+                model=selected_model,
+                max_tokens=1024,
+                system=system_prompt,
+                messages=[{"role": "user", "content": req.message}]
+            )
+            return {"response": message.content[0].text, "model_used": selected_model}
+            
+        else:  # Gemini (default)
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise HTTPException(status_code=500, detail="Gemini API Key not configured.")
+            model = genai.GenerativeModel(selected_model)
             response = model.generate_content(system_prompt)
-            return {"response": response.text + "\n\n[Warning: Quantum Core Recalibrating; Switched to Secondary Neural Link]"}
-        except:
-             raise HTTPException(status_code=500, detail=f"Total Neural Disconnect: {e}")
+            return {"response": response.text, "model_used": selected_model}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Neural Connectivity Error ({selected_model}): {e}")
+        # Fallback to Gemini if other providers fail
+        if "gemini" not in selected_model:
+            try:
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                response = model.generate_content(system_prompt)
+                return {"response": response.text + f"\n\n[Fallback: {selected_model} unavailable, routed to Gemini 1.5 Flash]", "model_used": "gemini-1.5-flash"}
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=f"AI Engine Error ({selected_model}): {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
