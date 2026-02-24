@@ -361,6 +361,7 @@ async def clear_dev_messages(authorization: str = Header(None)):
     db.close()
     return {"status": "success"}
 
+@app.get("/admin/users")
 @app.get("/dev/users")
 async def get_dev_users():
     db = SessionLocal()
@@ -762,7 +763,8 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
             "velocity_count": velocity
         },
         corridor_risk=fx_report["corridor_risk"],
-        history_velocity=velocity
+        history_velocity=velocity,
+        profile=profile_engine
     )
 
     best_route = fx_report["comparisons"][0]
@@ -814,10 +816,24 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
                 asyncio.create_task(manager.send_personal_message(alert_payload, dev.id))
             except: pass
 
-    # Update Profile if legitimate (confirmed low risk)
-    if risk_report["risk_score"] < 20:
+    # Update Profile & ML Intelligence if legitimate (confirmed low risk)
+    # This is the "Self-Improving ML" logic from implementation plan
+    if risk_report["risk_score"] < 45 and profile_db:
+        alpha = 0.1 # 10% weight to new behavior
+        # EVOLVE BASELINES
+        profile_db.typing_speed = (profile_db.typing_speed * (1 - alpha)) + (request.typing_speed * alpha)
+        profile_db.mouse_velocity = (profile_db.mouse_velocity * (1 - alpha)) + (request.mouse_velocity * alpha)
+        
         profile_db.last_seen_epoch = now.timestamp()
-        profile_db.last_lat_long = f"{request.lat_long[0]},{request.lat_long[1]}" if request.lat_long else profile_db.last_lat_long
+        if request.lat_long:
+            profile_db.last_lat_long = f"{request.lat_long[0]},{request.lat_long[1]}"
+        
+        # Force Update the report with the NEW baseline so UI reflects learning immediately
+        risk_report["baseline_profile"]["typing_speed"] = profile_db.typing_speed
+        risk_report["baseline_profile"]["mouse_velocity"] = profile_db.mouse_velocity
+        risk_report["recommendation_detail"] += f" [ML INTELLIGENCE EVOLVED: Baseline synchronized for {profile_db.username}]"
+        
+        print(f"ML INTELLIGENCE UPDATE: Identity baseline evolved for {profile_db.username}. New Speed: {profile_db.typing_speed:.1f}")
         
     db.commit()
     db.close()
@@ -922,8 +938,10 @@ async def advisor_chat(req: AdvisorRequest):
     except Exception as e:
         print(f"Neural Connectivity Error ({selected_model}): {e}")
         # Fallback to Gemini if other providers fail
-        if "gemini" not in selected_model:
+        # Fallback to a lighter Gemini model if primary fails
+        if selected_model != "gemini-1.5-flash":
             try:
+                print(f"FALLBACK TRIGGERED: Attempting route to gemini-1.5-flash")
                 model = genai.GenerativeModel('gemini-1.5-flash')
                 response = model.generate_content(system_prompt)
                 return {"response": response.text + f"\n\n[Fallback: {selected_model} unavailable, routed to Gemini 1.5 Flash]", "model_used": "gemini-1.5-flash"}

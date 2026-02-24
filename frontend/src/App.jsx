@@ -11,7 +11,7 @@ import {
     Building, BarChart3, ShieldCheck, ShieldAlert, FileWarning, Lock,
     Eye, Layers, Send, Cpu, History, Settings, MessageSquare,
     Keyboard, MousePointer, Smartphone, Info, Menu, X,
-    Loader, Download, ArrowRight, Trash, Trash2
+    Loader, Download, ArrowRight, Trash, Trash2, Sun, Moon
 } from 'lucide-react';
 
 import AIAdvisor from './AIAdvisor';
@@ -179,6 +179,25 @@ const App = () => {
     const [settlementReceipt, setSettlementReceipt] = useState(null);
     const [securityBlock, setSecurityBlock] = useState(null); // { score, detail }
 
+    // Theme State
+    const [darkMode, setDarkMode] = useState(() => {
+        const saved = localStorage.getItem('securepay_theme');
+        return saved ? saved === 'dark' : true;
+    });
+
+    useEffect(() => {
+        if (darkMode) {
+            document.documentElement.classList.add('dark');
+            document.body.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+            document.body.classList.remove('dark');
+        }
+        localStorage.setItem('securepay_theme', darkMode ? 'dark' : 'light');
+    }, [darkMode]);
+
+    const toggleTheme = () => setDarkMode(!darkMode);
+
     // Auth State
     const [user, setUser] = useState(() => {
         try {
@@ -230,7 +249,14 @@ const App = () => {
         try {
             const resp = await API.post('/login', { username: loginUsername, password: loginPass });
             // Response includes { token, role, name, id, region, preference }
-            const userData = { role: resp.data.role, name: resp.data.name, id: resp.data.id, region: resp.data.region, preference: resp.data.preference };
+            const userData = {
+                username: resp.data.username,
+                role: resp.data.role,
+                name: resp.data.name,
+                id: resp.data.id,
+                region: resp.data.region,
+                preference: resp.data.preference
+            };
             setUser(userData);
             setTxnData(prev => ({ ...prev, priority: resp.data.preference || 'balanced' }));
             setToken(resp.data.token);
@@ -821,7 +847,7 @@ const App = () => {
     }
 
     if (user.role === 'dev') {
-        return <DevConsole user={user} token={token} onLogout={handleLogout} messages={messages} setMessages={setMessages} />;
+        return <DevConsole user={user} token={token} onLogout={handleLogout} messages={messages} setMessages={setMessages} darkMode={darkMode} toggleTheme={toggleTheme} />;
     }
 
     return (
@@ -837,15 +863,15 @@ const App = () => {
                 </div>
 
                 <div className="px-6 py-4 mb-4">
-                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 transition-colors">
                         <div className="text-[10px] uppercase opacity-40 font-bold mb-1">Session ID</div>
                         <div className="text-xs font-mono opacity-60 truncate">{token.slice(0, 12)}...</div>
                         <div className="flex items-center gap-2 mt-3">
                             <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 font-bold text-xs">
-                                {user.name.charAt(0)}
+                                {user.name?.charAt(0) || user.username?.charAt(0)}
                             </div>
                             <div>
-                                <div className="text-xs font-bold text-slate-900">{user.name}</div>
+                                <div className="text-xs font-bold text-slate-900 dark:text-white">{user.name || user.username}</div>
                                 <div className="text-[9px] opacity-40 uppercase font-bold">{user.role}</div>
                             </div>
                         </div>
@@ -882,7 +908,7 @@ const App = () => {
                                 <div className="text-[8px] font-black text-white bg-blue-600 px-2 py-1 rounded-sm uppercase text-center">Senior Lead</div>
                             </div>
                         </div>
-                        <button className="flex items-center gap-2 text-[10px] font-black opacity-40 hover:opacity-100 transition-all text-red-600 uppercase tracking-widest" onClick={handleLogout}>
+                        <button className="flex items-center gap-2 text-[10px] font-black opacity-40 hover:opacity-100 transition-all text-red-600 dark:text-red-400 uppercase tracking-widest" onClick={handleLogout}>
                             <X size={12} strokeWidth={3} /> Shutdown Session
                         </button>
                     </div>
@@ -891,18 +917,23 @@ const App = () => {
             <main className="main-content">
                 <div className="page-header">
                     <div className="page-header-left">
-                        <button type="button" className="md:hidden p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors mr-2" onClick={() => setIsMobileMenuOpen(true)} title="Open Menu"><Menu size={20} /></button>
-                        <button type="button" className="menu-toggle hidden md:flex" onClick={() => setSidebarOpen(true)} aria-label="Open menu"><Menu size={24} /></button>
+                        <button type="button" className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors mr-2 flex items-center justify-center" onClick={() => setIsMobileMenuOpen(true)} title="Open Menu"><Menu size={20} /></button>
+
                         <div>
                             <h2 className="text-3xl font-black">{meta.title}</h2>
                             <p className="font-semibold opacity-70">{meta.desc}</p>
                         </div>
                     </div>
                     <div className="header-actions">
+                        <button onClick={toggleTheme} className="theme-toggle-btn p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:scale-105 transition-all z-[100]" title="Toggle Theme">
+                            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+                        </button>
                         <button className={`fraud-toggle ${fraudMode ? 'active' : ''}`} onClick={() => setFraudMode(!fraudMode)}><span className="dot" />Fraud Simulation</button>
                         <span className="iso-badge">SECURE-V4.0-ID</span>
                     </div>
                 </div>
+
+
                 <AnimatePresence mode="wait" initial={false}>
                     {settlementReceipt ? (
                         <motion.div
@@ -987,7 +1018,7 @@ const App = () => {
 };
 
 /* ─────────── DEV CONSOLE ─────────── */
-const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
+const DevConsole = ({ user, token, onLogout, messages, setMessages, darkMode, toggleTheme }) => {
     const [activeTab, setActiveTab] = useState('overview');
     const [stats, setStats] = useState(null);
     const [pending, setPending] = useState([]);
@@ -995,30 +1026,24 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
     const [targetUser, setTargetUser] = useState('0'); // 0 for all users (broadcast)
     const [users, setUsers] = useState([]); // For user list in broadcast
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [statsResp, pendingResp, messagesResp, usersResp] = await Promise.all([
-                    API.get('/dev/stats', { headers: { Authorization: token } }),
-                    API.get('/dev/pending', { headers: { Authorization: token } }),
-                    API.get('/dev/messages', { headers: { Authorization: token } }),
-                    API.get('/admin/users', { headers: { Authorization: token } }) // Fetch all users for broadcast
-                ]);
-                setStats(statsResp.data);
-                setPending(pendingResp.data);
-                setMessages(messagesResp.data);
-                setUsers(usersResp.data);
-            } catch (e) { console.error("Failed to fetch dev data:", e); }
-        };
-        fetchData();
+    const [refreshing, setRefreshing] = useState(false);
+    const fetchData = useCallback(async () => {
+        setRefreshing(true);
+        try { const r = await API.get('/dev/stats', { headers: { Authorization: token } }); setStats(r.data); } catch (e) { console.error("Stats fetch error:", e); }
+        try { const r = await API.get('/dev/pending', { headers: { Authorization: token } }); setPending(r.data); } catch (e) { console.error("Pending fetch error:", e); }
+        try { const r = await API.get('/dev/messages', { headers: { Authorization: token } }); setMessages(r.data); } catch (e) { console.error("Messages fetch error:", e); }
+        try { const r = await API.get('/dev/users', { headers: { Authorization: token } }); setUsers(r.data); } catch (e) { console.error("Users fetch error:", e); }
+        setTimeout(() => setRefreshing(false), 600);
     }, [token]);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
     const review = async (id, action) => {
         try {
             await API.patch(`/dev/transactions/${id}/review`, { action }, { headers: { Authorization: token } });
             setPending(prev => prev.filter(t => t.id !== id));
-            // Force refresh history if visible
-            fetchHistory();
         } catch (e) { alert(e.response?.data?.detail || "Review failed"); }
     };
 
@@ -1058,57 +1083,76 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
         } catch (e) { alert(e.response?.data?.detail || "Clear failed"); }
     };
 
+    const themeClass = darkMode ? 'terminal-dark' : 'terminal-light';
+    const accentColor = darkMode ? '#10b981' : '#059669'; // Emerald 500 / 600
+
     return (
-        <div className="card rounded-none overflow-hidden border-none shadow-none bg-black">
-            <div className="bg-black border-b border-[#00ff41]/30 flex justify-between items-center py-3 px-6">
-                <div className="flex items-center gap-3">
-                    <div className="text-[#00ff41]"><Cpu size={18} /></div>
-                    <div>
-                        <h3 className="text-[#00ff41] font-mono font-bold uppercase tracking-tight text-xs">DevOps Security Terminal</h3>
-                        <div className="text-[9px] text-[#00ff41]/50 font-mono uppercase tracking-[0.3em] font-black">Secure Shell V4.5</div>
+        <div className={`card rounded-3xl overflow-hidden border-none shadow-2xl transition-all duration-500 ${themeClass}`} style={{ boxShadow: darkMode ? '0 25px 50px -12px rgba(0,0,0,0.5)' : '0 25px 50px -12px rgba(0,0,0,0.1)' }}>
+            <div className={`flex justify-between items-center py-2 px-6 transition-colors ${darkMode ? 'bg-[#0f172a] border-b border-white/5' : 'bg-slate-200 border-b border-slate-300'}`}>
+                <div className="flex items-center gap-4">
+                    <div className="flex gap-1.5">
+                        <div className="w-3 h-3 rounded-full bg-red-500/50" />
+                        <div className="w-3 h-3 rounded-full bg-amber-500/50" />
+                        <div className="w-3 h-3 rounded-full bg-emerald-500/50" />
+                    </div>
+                    <div className="h-4 w-[1px] bg-slate-500/20 mx-1" />
+                    <div className="flex items-center gap-2">
+                        <div style={{ color: accentColor }} className="opacity-80"><Cpu size={14} /></div>
+                        <h3 className={`font-mono font-bold uppercase tracking-[0.1em] text-[10px] ${darkMode ? 'text-emerald-400/80' : 'text-slate-600'}`}>DevOps::SecureShell_V4.5</h3>
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                     <button
                         onClick={toggleTheme}
-                        className="text-[#00ff41] border border-[#00ff41]/20 px-2 py-1 rounded font-mono text-[9px] hover:bg-[#00ff41]/10 transition-all uppercase"
+                        className={`p-1.5 rounded-lg transition-all ${darkMode ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-slate-600 hover:bg-slate-300'}`}
+                        title="Toggle Console Theme"
                     >
-                        [ {darkMode ? 'Switch::Light' : 'Switch::Dark'} ]
+                        {darkMode ? <Sun size={14} /> : <Moon size={14} />}
                     </button>
-                    <button onClick={onLogout} className="text-red-500 hover:text-red-400 font-mono text-xs font-bold" title="Kill Session">[ DISCONNECT ]</button>
+                    <button onClick={onLogout} className="text-red-500/80 hover:text-red-500 transition-colors p-1" title="Kill Session"><X size={16} /></button>
                 </div>
             </div>
 
-            <div className="flex bg-[#001400] border-b border-[#00ff41]/10">
-                {['overview', 'pending', 'comms', 'wipe'].map(t => (
+            <div className={`flex items-center px-4 transition-colors ${darkMode ? 'bg-black/20 border-b border-white/5' : 'bg-slate-50 border-b border-slate-200'}`}>
+                {['overview', 'pending', 'comms', 'users', 'ai', 'wipe'].map(t => (
                     <button
                         key={t}
                         onClick={() => setActiveTab(t)}
-                        className={`flex-1 py-2 text-[10px] font-mono uppercase tracking-widest transition-all ${activeTab === t ? 'text-black bg-[#00ff41] font-black' : 'text-[#00ff41]/40 hover:text-[#00ff41] hover:bg-[#00ff41]/5'}`}
+                        className={`px-6 py-3 text-[9px] font-mono font-bold uppercase tracking-[0.2em] transition-all relative group ${activeTab === t ? (darkMode ? 'text-emerald-400' : 'text-slate-900') : (darkMode ? 'text-white/30 hover:text-white/60' : 'text-slate-400 hover:text-slate-600')}`}
                     >
                         {t}
+                        {activeTab === t && (
+                            <motion.div
+                                layoutId="activeTab"
+                                className={`absolute bottom-0 left-4 right-4 h-[2px] rounded-full ${darkMode ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-900'}`}
+                            />
+                        )}
                     </button>
                 ))}
             </div>
 
-            <div className="card-body bg-black min-h-[500px] p-6 text-[#00ff41] font-mono text-xs relative">
+            <div className={`card-body min-h-[500px] p-6 font-mono text-xs relative transition-colors ${darkMode ? 'bg-black text-emerald-500' : 'bg-white text-slate-800'}`}>
                 {activeTab === 'overview' && (
                     <div className="space-y-6 animate-in">
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="p-3 border border-[#00ff41]/20 bg-[#001400]">
-                                <span className="block text-[10px] opacity-50 uppercase mb-1">Total_Transactions</span>
-                                <span className="text-xl text-[#00ff41] font-black">{stats?.total_transactions || 0}</span>
+                            <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'border-emerald-500/10 bg-black/40 hover:border-emerald-500/30' : 'bg-slate-50 border-slate-200'}`}>
+                                <span className="block text-[10px] opacity-40 uppercase font-black mb-1">Total_Transactions</span>
+                                <span className={`text-2xl font-black ${darkMode ? 'text-emerald-400' : 'text-slate-900'}`}>{stats?.total_transactions || 0}</span>
                             </div>
-                            <div className="p-3 border border-orange-500/20 bg-orange-950/20">
-                                <span className="block text-[10px] text-orange-500/70 uppercase mb-1">Queue_Pending</span>
-                                <span className="text-xl text-orange-500 font-black">{stats?.pending || 0}</span>
+                            <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'border-orange-500/10 bg-orange-950/10 hover:border-orange-500/30' : 'bg-orange-50 border-orange-200'}`}>
+                                <span className={`block text-[10px] uppercase font-black mb-1 ${darkMode ? 'text-orange-500/70' : 'text-orange-600/70'}`}>Queue_Pending</span>
+                                <span className={`text-2xl font-black ${darkMode ? 'text-orange-500' : 'text-orange-600'}`}>{stats?.pending || 0}</span>
                             </div>
                         </div>
-                        <div className="space-y-1 py-2 opacity-60">
+                        <div className="space-y-2 py-4 border-t border-white/5 mt-4">
+                            <div className="text-[9px] opacity-30 font-black uppercase tracking-[0.2em] mb-2">Systems_Status_Matrix</div>
                             {['Kernel', 'FX_Service', 'Biometrics', 'DB_Socket'].map(s => (
-                                <div key={s} className="flex justify-between items-center text-[9px]">
-                                    <span>{s}::LINK_STATE</span>
-                                    <span className="text-[#00ff41]">STABLE</span>
+                                <div key={s} className="flex justify-between items-center text-[10px] font-mono group">
+                                    <span className="opacity-40 group-hover:opacity-100 transition-opacity">{s}::CORE_LINK</span>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                                        <span style={{ color: accentColor }} className="font-bold">ACTIVE</span>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -1116,24 +1160,30 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
                 )}
 
                 {activeTab === 'pending' && (
-                    <div className="space-y-4 animate-in">
+                    <div className="space-y-3 animate-in-up">
                         {pending.length === 0 ? (
-                            <div className="text-center py-20 opacity-20">NO_DATA_STREAM::PENDING_EMPTY</div>
+                            <div className="text-center py-20 opacity-20 flex flex-col items-center gap-4">
+                                <Clock size={32} />
+                                <div className="text-[10px] tracking-[0.4em] font-black uppercase">SYSTEM_IDLE::QUEUE_EMPTY</div>
+                            </div>
                         ) : (
                             pending.map(t => (
-                                <div key={t.id} className="p-4 border border-[#00ff41]/20 bg-[#001400] hover:border-[#00ff41]/40 transition-all group">
-                                    <div className="flex justify-between text-[10px] mb-3">
-                                        <span className="text-[#00ff41] font-black tracking-widest uppercase">TXN_ID_{t.id}</span>
+                                <div key={t.id} className={`p-5 rounded-2xl border transition-all group relative overflow-hidden ${darkMode ? 'border-emerald-500/10 bg-black/40 hover:border-emerald-500/30' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`}>
+                                    <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 blur-3xl rounded-full -mr-12 -mt-12" />
+                                    <div className="flex justify-between text-[8px] mb-4 font-black">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`px-2 py-0.5 rounded-sm ${darkMode ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-900 text-white'} uppercase tracking-widest`}>TXN_ID_{t.id}</span>
+                                            <span className="opacity-40 uppercase">{t.location}</span>
+                                        </div>
                                         <span className="opacity-40">{new Date(t.time).toLocaleTimeString()}</span>
                                     </div>
-                                    <div className="text-lg font-black text-white mb-2 leading-none">{t.amount} {t.base_currency} <span className="text-[10px] opacity-40 font-normal">{'->'}</span> {t.target_currency}</div>
-                                    <div className="text-[10px] space-y-1 mb-4 opacity-70">
-                                        <div>LOCATION: {t.location}</div>
-                                        <div>RISK_LVL: {t.risk_level} ({t.risk_score})</div>
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>{t.amount.toLocaleString()} {t.base_currency} <span className="opacity-20 mx-1">{'>'}</span> <span className="text-emerald-500">{t.target_currency}</span></div>
+                                        <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${t.risk_score > 70 ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>{t.risk_level}</div>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => review(t.id, 'approve')} className="flex-1 py-1.5 border border-[#00ff41] text-[#00ff41] text-[9px] font-black uppercase hover:bg-[#00ff41] hover:text-black transition-all">Approve</button>
-                                        <button onClick={() => review(t.id, 'deny')} className="flex-1 py-1.5 border border-red-500 text-red-500 text-[9px] font-black uppercase hover:bg-red-500 hover:text-black transition-all">Deny</button>
+                                    <div className="flex gap-3">
+                                        <button onClick={() => review(t.id, 'approve')} className={`flex-1 py-2.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${darkMode ? 'border-emerald-500/50 text-emerald-400 hover:bg-emerald-500 hover:text-black' : 'border-slate-800 text-slate-800 hover:bg-slate-900 hover:text-white'}`}>Validate & Approve</button>
+                                        <button onClick={() => review(t.id, 'deny')} className="flex-1 py-2.5 rounded-xl border border-red-500/50 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">Deny Request</button>
                                     </div>
                                 </div>
                             ))
@@ -1142,23 +1192,26 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
                 )}
 
                 {activeTab === 'comms' && (
-                    <div className="space-y-4 animate-in">
-                        <div className="flex justify-between items-center mb-4 border-b border-[#00ff41]/10 pb-2">
-                            <span className="text-[9px] opacity-40 uppercase font-black tracking-[0.2em]">Inbound_Data_Packets</span>
-                            <button onClick={handleClearComms} className="text-[9px] text-red-500 hover:text-red-400 font-black uppercase underline tracking-tighter">[ PURGE_TERMINAL ]</button>
+                    <div className="space-y-6 animate-in-up">
+                        <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                <span className="text-[10px] opacity-40 uppercase font-black tracking-[0.2em]">Secure_Data_Packets</span>
+                            </div>
+                            <button onClick={handleClearComms} className="text-[9px] text-red-500/70 hover:text-red-500 font-bold uppercase underline tracking-tighter transition-colors">[ PURGE_ALL ]</button>
                         </div>
-                        <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-[#00ff41]/20">
+                        <div className="max-h-[350px] overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-emerald-500/20">
                             {messages.length === 0 ? (
-                                <div className="text-center py-10 opacity-20 uppercase tracking-widest text-[10px]">Ready_For_Transmission</div>
+                                <div className="text-center py-16 opacity-10 uppercase tracking-[0.3em] text-[9px] font-black italic">Passive_Listening_Node_Online</div>
                             ) : (
                                 messages.map(m => (
-                                    <div key={m.id} className={`p-4 border group relative ${m.type === 'security_incident' ? 'bg-red-950/20 border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.1)]' : 'bg-[#001400] border-[#00ff41]/10'}`}>
-                                        <div className="flex justify-between text-[8px] mb-2 font-black">
-                                            <span className={`${m.type === 'security_incident' ? 'text-red-500' : 'text-[#00ff41]'} uppercase tracking-widest`}>
-                                                {m.type === 'security_incident' ? '>> SECURITY_ALERT' : `>> SRC: UID_${m.from_username || 'SYS'}`}
+                                    <div key={m.id} className={`p-4 rounded-xl border group relative transition-all ${m.type === 'security_incident' ? 'bg-red-950/20 border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.05)]' : (darkMode ? 'bg-black/40 border-white/5 hover:border-emerald-500/20' : 'bg-slate-50 border-slate-200 hover:border-slate-300')}`}>
+                                        <div className="flex justify-between text-[7px] mb-3 font-black">
+                                            <span className={`${m.type === 'security_incident' ? 'text-red-500' : (darkMode ? 'text-emerald-500/80' : 'text-slate-600')} uppercase tracking-[0.2em]`}>
+                                                {m.type === 'security_incident' ? 'Critical Security Fault' : `Packet_Src::UID_${m.from_username || 'SYSTEM_CORE'}`}
                                             </span>
-                                            <div className="flex items-center gap-2">
-                                                <span className="opacity-40">{new Date(m.time).toLocaleTimeString()}</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="opacity-30">{new Date(m.time).toLocaleTimeString()}</span>
                                                 <button
                                                     onClick={() => {
                                                         if (window.confirm("Drop packet?")) {
@@ -1166,25 +1219,25 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
                                                                 .then(() => setMessages(prev => prev.filter(x => x.id !== m.id)))
                                                         }
                                                     }}
-                                                    className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all font-mono"
+                                                    className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all font-mono scale-90"
                                                 >
-                                                    [DELETE]
+                                                    [PURGE]
                                                 </button>
                                             </div>
                                         </div>
-                                        <p className="text-[11px] leading-relaxed opacity-80">{m.message}</p>
+                                        <p className={`text-[11px] leading-relaxed font-medium ${darkMode ? 'text-white/80' : 'text-slate-800'}`}>{m.message}</p>
                                     </div>
                                 ))
                             )}
                         </div>
-                        <div className="h-[1px] bg-[#00ff41]/10 mt-6 mb-4" />
-                        <form onSubmit={handleSendMessage} className="space-y-3">
-                            <div className="text-[9px] opacity-40 uppercase font-black tracking-widest">Transmit_Command_Packet</div>
-                            <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="h-[1px] bg-white/5 mt-6 mb-4" />
+                        <form onSubmit={handleSendMessage} className="space-y-4">
+                            <div className="text-[9px] opacity-20 uppercase font-black tracking-widest">Global_Command_Broadcast</div>
+                            <div className="flex flex-col sm:flex-row gap-3">
                                 <select
                                     value={targetUser}
                                     onChange={e => setTargetUser(e.target.value)}
-                                    className="bg-black border border-[#00ff41]/30 p-2 text-[10px] text-[#00ff41] outline-none focus:border-[#00ff41]"
+                                    className={`border p-3 rounded-xl text-[10px] font-bold outline-none transition-all min-w-[140px] ${darkMode ? 'bg-black border-white/10 text-emerald-400 focus:border-emerald-500' : 'bg-white border-slate-300 text-slate-800 focus:border-slate-900'}`}
                                 >
                                     <option value="0">BROADCAST_ALL</option>
                                     {users.filter(u => u.role !== 'dev').map(u => (
@@ -1196,13 +1249,78 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages }) => {
                                         type="text"
                                         value={devMsg}
                                         onChange={e => setDevMsg(e.target.value)}
-                                        placeholder="ENCODE_MSG..."
-                                        className="flex-1 bg-black border border-[#00ff41]/30 p-2 text-[10px] text-[#00ff41] outline-none focus:border-[#00ff41]"
+                                        placeholder="ENCODE_MESSAGE_FOR_TRANSMISSION..."
+                                        className={`flex-1 border p-3 rounded-xl text-[10px] font-bold outline-none transition-all ${darkMode ? 'bg-black border-white/10 text-emerald-400 focus:border-emerald-500 placeholder:text-white/10' : 'bg-white border-slate-300 text-slate-800 focus:border-slate-900'}`}
                                     />
-                                    <button type="submit" className="bg-[#00ff41] text-black px-4 font-black uppercase text-[10px] hover:bg-white transition-all">Push</button>
+                                    <button type="submit" className={`px-6 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${darkMode ? 'bg-emerald-500 text-black hover:bg-white shadow-[0_0_20px_rgba(16,185,129,0.2)]' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>Push</button>
                                 </div>
                             </div>
                         </form>
+                    </div>
+                )}
+
+                {activeTab === 'users' && (
+                    <div className="animate-in-up space-y-4">
+                        <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                <span className="text-[10px] opacity-40 uppercase font-black tracking-[0.2em]">Identity_Registry</span>
+                            </div>
+                            <span className="text-[9px] opacity-20 font-mono">{users.length} accounts loaded</span>
+                        </div>
+                        {users.length === 0 ? (
+                            <div className="text-center py-20 opacity-20 flex flex-col items-center gap-4">
+                                <Eye size={32} />
+                                <div className="text-[10px] tracking-[0.4em] font-black uppercase">LOADING_USER_REGISTRY...</div>
+                            </div>
+                        ) : (
+                            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                                {users.map(u => (
+                                    <div key={u.id} className={`flex items-center justify-between p-4 rounded-xl border transition-all group ${darkMode ? 'border-white/5 bg-black/40 hover:border-emerald-500/20' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`}>
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black uppercase ${u.role === 'dev' ? 'bg-emerald-500/20 text-emerald-400' : u.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                                {u.username?.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <div className={`font-bold text-xs ${darkMode ? 'text-white' : 'text-slate-900'}`}>{u.username}</div>
+                                                <div className="text-[9px] opacity-40 font-mono uppercase">{u.role} • UID_{u.id}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${u.is_blocked ? 'bg-red-500/15 text-red-500' : 'bg-emerald-500/15 text-emerald-500'}`}>
+                                                {u.is_blocked ? 'LOCKED' : 'ACTIVE'}
+                                            </span>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => {
+                                                    const msg = window.prompt("Direct message:");
+                                                    if (msg) API.post('/admin/alerts', { user_id: u.id, message: msg, type: 'info' }, { headers: { Authorization: token } });
+                                                }} className="p-1 hover:text-emerald-400 transition-colors" title="Message"><Send size={12} /></button>
+                                                <button onClick={async () => {
+                                                    try { await API.patch(`/admin/users/${u.id}/block`, {}, { headers: { Authorization: token } }); const resp = await API.get('/admin/users', { headers: { Authorization: token } }); setUsers(resp.data); } catch (e) { console.error(e); }
+                                                }} className="p-1 hover:text-orange-400 transition-colors" title={u.is_blocked ? "Unblock" : "Block"}><Lock size={12} className={u.is_blocked ? "text-red-500" : ""} /></button>
+                                                {u.role !== 'dev' && (
+                                                    <button onClick={async () => {
+                                                        if (!window.confirm(u.role === 'admin' ? "Demote?" : "Promote?")) return;
+                                                        try { await API.patch(`/admin/users/${u.id}/role`, {}, { headers: { Authorization: token } }); const resp = await API.get('/admin/users', { headers: { Authorization: token } }); setUsers(resp.data); } catch (e) { alert(e.response?.data?.detail || "Failed"); }
+                                                    }} className={`p-1 hover:text-purple-500 transition-colors ${u.role === 'admin' ? 'text-purple-400' : 'opacity-40'}`} title={u.role === 'admin' ? "Demote" : "Promote"}><Shield size={12} /></button>
+                                                )}
+                                                {u.role !== 'dev' && (
+                                                    <button onClick={async () => {
+                                                        if (!window.confirm("Delete account?")) return;
+                                                        try { await API.delete(`/admin/users/${u.id}`, { headers: { Authorization: token } }); const resp = await API.get('/admin/users', { headers: { Authorization: token } }); setUsers(resp.data); } catch (e) { console.error(e); }
+                                                    }} className="p-1 hover:text-red-500 transition-colors"><X size={12} /></button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+                {activeTab === 'ai' && (
+                    <div className="animate-in-up h-full overflow-y-auto" style={{ minHeight: '450px' }}>
+                        <AIAdvisor user={user} token={token} forceDarkMode={true} />
                     </div>
                 )}
 

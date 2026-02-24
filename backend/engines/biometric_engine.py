@@ -20,8 +20,24 @@ class BiometricEngine:
         # [speed, mouse, device_match, loc_match, amt_scaled, hour, copy_paste, vpn_flag]
         self.ml_expected = [0.62, 0.45, 0, 0, 0.25, 0.5, 0, 0] 
         
-    def calculate_ml_anomaly_score(self, current_metrics, profile):
+    def calculate_ml_anomaly_score(self, current_metrics, profile=None):
         """Advanced ML-based anomaly detection using Isolation Forest concept from proooject"""
+        if profile is None:
+            profile = self.baselines["default"]
+            
+        # Dynamically derive expected values from user's current baseline
+        # This makes the ML truly "self-improving" as requested
+        user_expected = [
+            profile["typing_speed"] / 100,
+            profile["mouse_velocity"] / 1000,
+            0, # Device match
+            0, # Location match
+            current_metrics.get("amount", 25000) / 100000, # Expected amount (neutralized)
+            current_metrics.get("session_hour", 12) / 24, # Expected hour (neutralized)
+            0, # Copy-paste
+            0  # VPN
+        ]
+            
         features = []
         features.append(current_metrics.get("typing_speed", profile["typing_speed"]) / 100)
         features.append(current_metrics.get("mouse_velocity", profile["mouse_velocity"]) / 1000)
@@ -33,11 +49,11 @@ class BiometricEngine:
         features.append(1 if current_metrics.get("is_vpn") else 0)
         
         anomaly_score = 0
-        for i, (feature, exp) in enumerate(zip(features, self.ml_expected)):
+        for i, (feature, exp) in enumerate(zip(features, user_expected)):
             deviation = abs(feature - exp)
             # Add sensitivity weighting
             # [typing, mouse, device, ip, amount, hour, paste, vpn]
-            weight = [1.2, 1.0, 1.5, 1.3, 0.8, 0.5, 2.0, 2.5][i]
+            weight = [1.5, 1.2, 1.5, 1.3, 0.5, 0.4, 2.5, 3.0][i]
             anomaly_score += deviation * weight
             
         anomaly_score = min(anomaly_score, 1.0)
@@ -250,9 +266,10 @@ class BiometricEngine:
         """Returns the full baseline profile for UI synchronization."""
         return self.baselines["default"]
 
-    def calculate_unified_risk_score(self, current_metrics, corridor_risk, history_velocity=0):
+    def calculate_unified_risk_score(self, current_metrics, corridor_risk, history_velocity=0, profile=None):
         """Unified risk assessment combining multiple factors from proooject"""
-        profile = self.baselines["default"]
+        if profile is None:
+            profile = self.baselines["default"]
         
         # 1. Behavioral Biometrics (Anomalies)
         anomalies = self.identify_anomalies(current_metrics, profile)

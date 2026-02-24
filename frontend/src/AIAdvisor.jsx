@@ -3,9 +3,10 @@ import { Send, Activity, ShieldCheck, Sparkles, ChevronDown, Check } from 'lucid
 import API from './api';
 
 
-const AIAdvisor = ({ user, token }) => {
+const AIAdvisor = ({ user, token, forceDarkMode = false }) => {
+    const username = user?.username || user?.name || 'Agent';
     const [messages, setMessages] = useState([
-        { role: 'assistant', text: `Greetings, ${user.username}. I am the SecurePay AI Quantum Optimizer. I have synchronized with the global risk ledger. How can I assist you with your forensic financial analysis today?` }
+        { role: 'assistant', text: `Greetings, ${username}. I am the SecurePay AI Quantum Optimizer. I have synchronized with the global risk ledger. How can I assist you with your forensic financial analysis today?` }
     ]);
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -19,6 +20,10 @@ const AIAdvisor = ({ user, token }) => {
     useEffect(() => {
         scrollToBottom();
     }, [messages, isTyping]);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
 
     useEffect(() => {
         const fetchModels = async () => {
@@ -75,7 +80,7 @@ const AIAdvisor = ({ user, token }) => {
     };
 
     return (
-        <div className="animate-in-up flex flex-col h-[600px] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-950 shadow-xl transition-all">
+        <div className={`animate-in-up flex flex-col h-[600px] border rounded-2xl overflow-hidden shadow-xl transition-all ${forceDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200 dark:border-slate-800 dark:bg-slate-950'}`}>
             <div className="bg-slate-900 text-white p-4 flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="bg-emerald-500/20 p-2 rounded-lg text-emerald-400">
