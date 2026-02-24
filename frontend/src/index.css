@@ -170,6 +170,35 @@ body.dark {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
+/* Force light theme for login view regardless of global state */
+.login-view {
+    background: radial-gradient(circle at center, #ffffff 0%, #f1f5f9 100%) !important;
+}
+
+.login-view .login-card {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+
+.login-view .login-card * {
+    color: #0f172a !important;
+}
+
+.login-view .login-header p {
+    color: #475569 !important;
+}
+
+.login-view .input-group input {
+    background: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+
+.login-view .login-header .white-bg-badge {
+    background: white !important;
+}
+
 /* ===== LAYOUT ===== */
 .app-layout {
     display: flex;
@@ -541,6 +570,15 @@ body.dark {
     background: #ffffff;
 }
 
+.dark .form-input-icon {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.dark .form-input-icon:focus-within {
+    background: #1e293b;
+}
+
 .form-input {
     background: transparent;
     border: none;
@@ -880,6 +918,11 @@ body.dark {
     border-top: 1px solid var(--glass-border);
     border-bottom: 1px solid var(--glass-border);
     transition: all 0.2s ease;
+    color: var(--text-primary);
+}
+
+.dark .provider-table td {
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .provider-table tr.selected td {

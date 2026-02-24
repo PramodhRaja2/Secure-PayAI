@@ -367,7 +367,7 @@ async def get_dev_users():
     db = SessionLocal()
     users = db.query(UserProfile).all()
     db.close()
-    return [{"id": u.id, "username": u.username, "role": u.role} for u in users]
+    return [{"id": u.id, "username": u.username, "role": u.role, "is_blocked": u.is_blocked} for u in users]
 
 @app.post("/dev/message")
 async def send_dev_message(payload: dict, authorization: str = Header(None)):
@@ -853,9 +853,8 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
 @app.get("/advisor/models")
 async def get_advisor_models():
     models = [
-        {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash", "provider": "google", "icon": "✦"},
-        {"id": "gpt-4o", "name": "GPT-4o (ChatGPT)", "provider": "openai", "icon": "⚛"},
         {"id": "claude-3-5-sonnet-20240620", "name": "Claude 3.5 Sonnet", "provider": "anthropic", "icon": "λ"},
+        {"id": "gpt-4o", "name": "GPT-4o (ChatGPT)", "provider": "openai", "icon": "⚛"},
     ]
     return models
 
@@ -925,28 +924,37 @@ async def advisor_chat(req: AdvisorRequest):
             )
             return {"response": message.content[0].text, "model_used": selected_model}
             
-        else:  # Gemini (default)
-            api_key = os.getenv("GEMINI_API_KEY")
+        else:
+            # Default to GPT-4o if model is unknown or Gemini was selected
+            api_key = os.getenv("OPENAI_API_KEY")
             if not api_key:
-                raise HTTPException(status_code=500, detail="Gemini API Key not configured.")
-            model = genai.GenerativeModel(selected_model)
-            response = model.generate_content(system_prompt)
-            return {"response": response.text, "model_used": selected_model}
+                raise HTTPException(status_code=500, detail="OpenAI API Key not configured.")
+            client = openai.OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": req.message}]
+            )
+            return {"response": response.choices[0].message.content, "model_used": "gpt-4o"}
             
     except HTTPException:
         raise
     except Exception as e:
         print(f"Neural Connectivity Error ({selected_model}): {e}")
-        # Fallback to Gemini if other providers fail
-        # Fallback to a lighter Gemini model if primary fails
-        if selected_model != "gemini-1.5-flash":
+        # Fallback to GPT-4o if Claude/other fails
+        if selected_model != "gpt-4o":
             try:
-                print(f"FALLBACK TRIGGERED: Attempting route to gemini-1.5-flash")
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                response = model.generate_content(system_prompt)
-                return {"response": response.text + f"\n\n[Fallback: {selected_model} unavailable, routed to Gemini 1.5 Flash]", "model_used": "gemini-1.5-flash"}
-            except:
-                pass
+                print(f"FALLBACK TRIGGERED: Attempting route to GPT-4o")
+                api_key = os.getenv("OPENAI_API_KEY")
+                if api_key:
+                    client = openai.OpenAI(api_key=api_key)
+                    response = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": req.message}]
+                    )
+                    return {"response": response.choices[0].message.content + f"\n\n[Fallback: {selected_model} unavailable, routed to GPT-4o]", "model_used": "gpt-4o"}
+            except Exception as fe:
+                print(f"Critical System Failure: {fe}")
+        
         raise HTTPException(status_code=500, detail=f"AI Engine Error ({selected_model}): {str(e)}")
 
 if __name__ == "__main__":

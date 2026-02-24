@@ -768,7 +768,7 @@ const App = () => {
         {
             title: 'Governance', items: [
                 { id: 'admin_stats', icon: <Activity size={16} />, label: 'Admin Insight', adminOnly: true },
-                { id: 'users', icon: <Settings size={16} />, label: 'User Management', adminOnly: true },
+                { id: 'users', icon: <Settings size={16} />, label: 'User Governance' },
                 { id: 'alerts', icon: <Zap size={16} />, label: 'Inbox & Broadcasts' }
             ]
         },
@@ -802,7 +802,7 @@ const App = () => {
                 <div className="login-card">
                     <div className="login-header">
                         <Activity color="#4f7df9" size={40} className="mx-auto" />
-                        <h2>{isRegistering ? 'Create Profile' : 'SecurePay AI v4.0'}</h2>
+                        <h2>{isRegistering ? 'Create Profile' : 'SecurePay AI Quantum v4.5'}</h2>
                         <div className="text-3xl font-black text-blue-500 my-4 uppercase tracking-tighter">Built By Pramodh Raja</div>
                         <p className="text-[10px] opacity-70 mb-4">{isRegistering ? 'Enterprise Identity Enrollment' : 'Identity & Specialized Governance Portal'}</p>
                         <div className="text-[9px] font-bold text-slate-400 bg-slate-50 py-2 px-3 rounded-lg border border-slate-100 mb-4">
@@ -884,8 +884,8 @@ const App = () => {
                         <React.Fragment key={sec.title}>
                             <div className="nav-section-title">{sec.title}</div>
                             {sec.items.map((n) => {
-                                // Admin only filter
-                                if (n.adminOnly && user.role !== 'admin') return null;
+                                // Role-based filter
+                                if (n.adminOnly && user.role !== 'admin' && user.role !== 'dev') return null;
                                 return (
                                     <div key={n.id} className={`nav-item ${activeNav === n.id ? 'active' : ''}`} onClick={() => handleNav(n.id)}>
                                         {n.icon} {n.label}

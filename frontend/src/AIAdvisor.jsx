@@ -64,7 +64,7 @@ const AIAdvisor = ({ user, token, forceDarkMode = false }) => {
                 {
                     message: userMsg,
                     user_id: user.id,
-                    model_id: currentModel?.id || 'gemini-2.0-flash'
+                    model_id: currentModel?.id || 'claude-3-5-sonnet-20240620'
                 },
                 { headers: { Authorization: token } }
             );

@@ -229,25 +229,25 @@ class BiometricEngine:
         hour = current_metrics.get("session_hour", 12)
         velocity = current_metrics.get("velocity_count", 0) # tx in last 10 mins
         
-        if velocity > 5:
+        if velocity > 3: # Lowered threshold for velocity alert
             anomalies.append({
-                "factor": "High Frequency",
+                "factor": "Velocity Pattern",
                 "icon": "zap",
                 "status": "critical",
-                "risk_contribution": 35,
-                "baseline": "1 tx/day",
+                "risk_contribution": 50,
+                "baseline": "1 tx/session",
                 "current": f"{velocity} attempts",
-                "deviation": "Velocity limit breached"
+                "deviation": "Rapid execution sequence (Bot behavior)"
             })
         elif hour not in profile["login_hours"]:
             anomalies.append({
-                "factor": "Session Timing",
+                "factor": "Temporal Anomaly",
                 "icon": "clock",
                 "status": "warning",
-                "risk_contribution": 10,
-                "baseline": "8AM-8PM",
-                "current": f"{hour}:00 UTC",
-                "deviation": "Off-peak access"
+                "risk_contribution": 15,
+                "baseline": "Standard Hours",
+                "current": f"{hour}:00",
+                "deviation": "Non-standard transaction window"
             })
         else:
              anomalies.append({
@@ -293,13 +293,13 @@ class BiometricEngine:
         # 5. Velocity Risk
         v_risk = min(40, (current_metrics.get("velocity_count", 0) * 8) + (history_velocity * 5))
         
-        # Weighted Combination Matrix (Enhanced for realism)
+        # Weighted Combination Matrix (Significantly more aggressive for behavioral/ML)
         unified_score = (
-            behavioral_score * 0.40 +
-            ml_score * 0.20 +
-            c_risk_score * 0.15 +
-            amt_risk * 0.10 +
-            v_risk * 0.15
+            behavioral_score * 0.50 + # Was 0.40
+            ml_score * 0.30 +         # Was 0.20
+            c_risk_score * 0.10 +      # Was 0.15
+            amt_risk * 0.05 +          # Was 0.10
+            v_risk * 0.05              # Was 0.15
         )
         
         unified_score = min(round(unified_score, 2), 100)
