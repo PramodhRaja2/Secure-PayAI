@@ -85,12 +85,12 @@ class BiometricEngine:
                 "current": f"{speed} WPM",
                 "deviation": "Non-human input (Paste/Automation)"
             })
-        elif dev > 0.30:
+        elif dev > 0.50: # High deviation threshold
             anomalies.append({
                 "factor": "Typing Dynamics",
                 "icon": "keyboard",
-                "status": "warning" if dev < 0.6 else "critical",
-                "risk_contribution": int(min(35, dev * 45)),
+                "status": "warning" if dev < 0.8 else "critical",
+                "risk_contribution": int(min(20, dev * 25)), # Lowered weight
                 "baseline": f"{profile['typing_speed']} WPM",
                 "current": f"{speed} WPM",
                 "deviation": f"{int(dev*100)}% variance"
@@ -109,12 +109,12 @@ class BiometricEngine:
         # 2. Mouse Logic
         vel = current_metrics.get("mouse_velocity", 0)
         m_dev = abs(vel - profile["mouse_velocity"]) / profile["mouse_velocity"]
-        if m_dev > 0.35:
+        if m_dev > 0.65: # High deviation threshold
             anomalies.append({
                 "factor": "Erratic Motion",
                 "icon": "mouse-pointer",
-                "status": "warning" if m_dev < 0.7 else "critical",
-                "risk_contribution": int(min(30, m_dev * 40)),
+                "status": "warning" if m_dev < 1.0 else "critical",
+                "risk_contribution": int(min(15, m_dev * 20)), # Lowered weight
                 "baseline": f"{profile['mouse_velocity']} px/s",
                 "current": f"{vel} px/s",
                 "deviation": "Unusual pathing (Bot-like)"
@@ -135,12 +135,12 @@ class BiometricEngine:
         dist = self._calculate_distance(curr_loc, profile["last_lat_long"])
         time_diff = (datetime.now().timestamp() - profile.get("last_seen_epoch", 0)) / 3600 # hours
         
-        if time_diff > 0 and (dist / time_diff) > 900: # Over 900km/h is impossible travel
+        if time_diff > 0 and (dist / time_diff) > 1200: # Mach 1+ air travel threshold
             anomalies.append({
                 "factor": "Impossible Travel",
                 "icon": "plane-takeoff",
                 "status": "critical",
-                "risk_contribution": 55,
+                "risk_contribution": 40, # Lowered from 55
                 "baseline": "New York",
                 "current": f"Distance: {int(dist)}km in {round(time_diff, 2)}h",
                 "deviation": "Physical travel mismatch"
@@ -150,7 +150,7 @@ class BiometricEngine:
                 "factor": "IP Geolocation",
                 "icon": "map-pin",
                 "status": "warning",
-                "risk_contribution": 25,
+                "risk_contribution": 10, # Lowered from 25
                 "baseline": profile["ip_location"],
                 "current": current_metrics.get("ip_location"),
                 "deviation": "Unusual access point"
@@ -293,13 +293,14 @@ class BiometricEngine:
         # 5. Velocity Risk
         v_risk = min(40, (current_metrics.get("velocity_count", 0) * 8) + (history_velocity * 5))
         
-        # Weighted Combination Matrix (Significantly more aggressive for behavioral/ML)
+        # Weighted Combination Matrix (Ultra-Balanced for Production)
+        # Reduced behavioral and ML weights to prevent "hallucinated" high risk
         unified_score = (
-            behavioral_score * 0.50 + # Was 0.40
-            ml_score * 0.30 +         # Was 0.20
-            c_risk_score * 0.10 +      # Was 0.15
-            amt_risk * 0.05 +          # Was 0.10
-            v_risk * 0.05              # Was 0.15
+            behavioral_score * 0.25 + 
+            ml_score * 0.20 +         
+            c_risk_score * 0.25 +     
+            amt_risk * 0.15 +         
+            v_risk * 0.15             
         )
         
         unified_score = min(round(unified_score, 2), 100)

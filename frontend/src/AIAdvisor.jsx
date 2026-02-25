@@ -5,7 +5,7 @@ import API from './api';
 const AIAdvisor = ({ user, token, forceDarkMode = false }) => {
     const username = user?.username || user?.name || 'Agent';
     const [messages, setMessages] = useState([
-        { role: 'assistant', text: `Forensic handshake complete, ${username}. Quantum-Class Financial Intelligence is now online through the Groq Neural Matrix. How shall we optimize your security perimeter today?` }
+        { role: 'assistant', text: `Forensic handshake complete, ${username}. Quantum-Class Financial Intelligence is now online through the GitHub Models Forensic Core. How shall we optimize your security perimeter today?` }
     ]);
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -33,7 +33,7 @@ const AIAdvisor = ({ user, token, forceDarkMode = false }) => {
                 const res = await API.get('/advisor/models', { headers: { Authorization: token } });
                 setModels(res.data);
                 // Default to GPT-OSS 120B
-                setCurrentModel(res.data.find(m => m.id === 'openai/gpt-oss-120b') || res.data[0]);
+                setCurrentModel(res.data.find(m => m.id === 'openai/gpt-5') || res.data[0]);
             } catch (err) {
                 console.error("Failed to load neural models:", err);
             } finally {
@@ -57,7 +57,7 @@ const AIAdvisor = ({ user, token, forceDarkMode = false }) => {
                 {
                     message: userMsg,
                     user_id: user.id,
-                    model_id: currentModel?.id || 'openai/gpt-oss-120b'
+                    model_id: currentModel?.id || 'openai/gpt-5'
                 },
                 { headers: { Authorization: token } }
             );
@@ -151,8 +151,8 @@ const AIAdvisor = ({ user, token, forceDarkMode = false }) => {
                 {messages.map((m, i) => (
                     <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in-fade`}>
                         <div className={`group relative max-w-[85%] p-4 rounded-[2rem] text-[15px] leading-relaxed shadow-sm transition-all hover:shadow-md ${m.role === 'user'
-                                ? 'bg-slate-900 dark:bg-emerald-600 text-white rounded-tr-none'
-                                : 'bg-white dark:bg-slate-900/90 dark:backdrop-blur-md border border-slate-200 dark:border-white/5 text-slate-800 dark:text-slate-200 rounded-tl-none'
+                            ? 'bg-slate-900 dark:bg-emerald-600 text-white rounded-tr-none'
+                            : 'bg-white dark:bg-slate-900/90 dark:backdrop-blur-md border border-slate-200 dark:border-white/5 text-slate-800 dark:text-slate-200 rounded-tl-none'
                             }`}>
                             {m.text}
                             <div className={`absolute -bottom-5 text-[9px] font-mono font-bold tracking-widest text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity uppercase ${m.role === 'user' ? 'right-2' : 'left-2'}`}>
@@ -218,7 +218,7 @@ const AIAdvisor = ({ user, token, forceDarkMode = false }) => {
                             <span>Verified Architecture</span>
                         </div>
                     </div>
-                    <div className="text-[9px] text-slate-500 italic">Connected to Groq Cloud Platform v4.2</div>
+                    <div className="text-[9px] text-slate-500 italic">Connected to GitHub AI Models Inference v5.0</div>
                 </div>
             </div>
         </div>

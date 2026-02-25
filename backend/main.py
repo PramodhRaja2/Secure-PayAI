@@ -1,6 +1,6 @@
 import os
 import asyncio
-from groq import Groq
+import openai
 from dotenv import load_dotenv
 
 # Load environment variables with absolute path
@@ -681,7 +681,8 @@ async def get_admin_stats(request: Request):
     total_volume = sum(t.amount for t in approved_txns)
     blocked_volume = sum(t.amount for t in blocked_txns)
     
-    fraud_rate = f"{round((len(blocked_txns) / total_txns * 100), 2) if total_txns else 0}%"
+    # Fraud rate grounded by a minimum transaction threshold to prevent high percentages in dev
+    fraud_rate = f"{round((len(blocked_txns) / max(total_txns, 5) * 100), 2) if total_txns else 0}%"
     
     db.close()
     
@@ -789,6 +790,7 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
                 from_username="Security Engine"
             )
             db.add(security_alert)
+            
             # Try to push via WebSocket
             try:
                 alert_payload = {
@@ -839,9 +841,9 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
 @app.get("/advisor/models")
 async def get_advisor_models():
     return [
-        {"id": "openai/gpt-oss-120b", "name": "GPT-OSS 120B", "provider": "Groq", "icon": "⚛"},
-        {"id": "llama-3.2-11b-vision-preview", "name": "Llama 3.2 11B Vision", "provider": "Meta/Groq", "icon": "👁️"},
-        {"id": "qwen/qwen3-32b", "name": "Qwen 3 32B", "provider": "Groq", "icon": "🐉"}
+        {"id": "openai/gpt-5", "name": "GPT-5 (GitHub Models)", "provider": "GitHub Models", "icon": "💠"},
+        {"id": "openai/gpt-4o", "name": "GPT-4o (GitHub Models)", "provider": "GitHub Models", "icon": "🎯"},
+        {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini", "provider": "GitHub Models", "icon": "⚡"}
     ]
 
 @app.post("/advisor/chat")
@@ -877,37 +879,41 @@ async def advisor_chat(req: AdvisorRequest):
     {req.message}
     
     CORE DIRECTIVES:
-    1. EXPLAIN exactly how your Biometric Engine (Typing Speed, Mouse Path, Network Latency) protects this specific transaction.
-    2. OPTIMIZE: If the user asks about rates, suggest methods to minimize spread and loss.
-    3. AUTHORITY: Respond with extreme clarity, confidence, and professional flair.
-    4. CONCISION: Provide high-density technical insights without unnecessary fluff.
+    1. OBJECTIVITY: Analyze security anomalies only when they are highly significant. Avoid using labels like 'FRAUD' or 'HIGH RISK' unless the risk score exceeds 85.
+    2. OPTIMIZE: Prioritize assisting {user.username} with minimizing spread, fees, and transfer latency.
+    3. STYLE: Respond with the calm, sophisticated authority of an elite financial advisor.
+    4. CONCISION: Deliver high-density technical analysis with a premium, professional feel.
     """
     
-    # Resilient Environment Loading with Heavy Diagnostics
-    selected_model = req.model_id or "openai/gpt-oss-120b"
-    print(f"[NEURAL_HANDSHAKE] Initializing for {selected_model}...")
+    # Resilient Environment Loading for GitHub Models
+    selected_model = req.model_id or "openai/gpt-4o"
+    print(f"[NEURAL_HANDSHAKE] Initializing GitHub Model: {selected_model}...")
     
     load_dotenv(dotenv_path, override=True)
-    api_key = os.getenv("GROQ_API_KEY")
+    github_token = os.getenv("GITHUB_TOKEN")
     
-    if not api_key:
+    if not github_token:
         print(f"[NEURAL_HANDSHAKE] os.getenv failed. Searching absolute path: {dotenv_path}")
         try:
             if os.path.exists(dotenv_path):
                 with open(dotenv_path, "r") as f:
                     for line in f:
-                        if line.startswith("GROQ_API_KEY="):
-                            api_key = line.split("=", 1)[1].strip().replace("'", "").replace('"', "")
-                            os.environ["GROQ_API_KEY"] = api_key
+                        if line.startswith("GITHUB_TOKEN="):
+                            github_token = line.split("=", 1)[1].strip().replace("'", "").replace('"', "")
+                            os.environ["GITHUB_TOKEN"] = github_token
                             print("[NEURAL_HANDSHAKE] Manual parse SUCCESS.")
         except Exception as e:
             print(f"[NEURAL_HANDSHAKE] Manual parse CRITICAL FAILURE: {e}")
 
     try:
-        if not api_key:
-             raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured. Ensure .env is in the backend directory.")
+        if not github_token:
+             raise HTTPException(status_code=500, detail="GITHUB_TOKEN not configured. Ensure .env is in the backend directory.")
             
-        client = Groq(api_key=api_key)
+        # Initialize OpenAI client with official GitHub AI Model inference endpoint
+        client = openai.OpenAI(
+            base_url="https://models.github.ai/inference",
+            api_key=github_token
+        )
         
         # Determine Model & Parameters
         params = {
@@ -916,22 +922,29 @@ async def advisor_chat(req: AdvisorRequest):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": req.message}
             ],
-            "temperature": 0.7 if "llama" in selected_model else 1.0,
-            "max_completion_tokens": 1024 if "llama" in selected_model else 8192,
+            "temperature": 1.0,
+            "max_tokens": 4096 if "o1" not in selected_model else None, # o1 manages its own reasoning
             "stream": False
         }
 
-        completion = client.chat.completions.create(**params)
-        
-        return {
-            "response": completion.choices[0].message.content, 
-            "model_used": selected_model,
-            "provider": "Groq"
-        }
+        try:
+            response = client.chat.completions.create(**params)
+            return {"response": response.choices[0].message.content}
+        except Exception as e:
+            # Automatic Fallback: If gpt-5 is unavailable, try gpt-4o
+            if "unavailable_model" in str(e) and params["model"] == "openai/gpt-5":
+                print("[NEURAL_FALLBACK] openai/gpt-5 unavailable. Redirecting to openai/gpt-4o...")
+                params["model"] = "openai/gpt-4o"
+                params["max_tokens"] = 4096
+                response = client.chat.completions.create(**params)
+                return {"response": response.choices[0].message.content}
+            
+            print(f"[NEURAL_ERROR] AI Engine Error (GitHub Models): {e}")
+            raise HTTPException(status_code=500, detail=f"AI Engine Error (GitHub Models): {e}")
             
     except Exception as e:
         print(f"[NEURAL_ERROR] Model: {selected_model} | Error: {e}")
-        raise HTTPException(status_code=500, detail=f"AI Engine Error (Groq): {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI Engine Error (GitHub Models): {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
