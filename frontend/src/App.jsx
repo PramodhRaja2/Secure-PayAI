@@ -7,7 +7,9 @@ import {
     LineElement, Title, Tooltip, Filler,
 } from 'chart.js';
 import {
-    Loader, Download, ArrowRight, Trash, Trash2, Sun, Moon
+    Activity, Shield, ShieldCheck, Zap, TrendingUp, BarChart3, History, Globe, Layers, FileWarning, Eye, Settings, Sun, Moon,
+    Clock, Terminal, Search, Info, Send, Menu, X, ArrowRight, Download, ChevronRight, Lock, UserPlus, Loader,
+    Keyboard, MousePointer, Smartphone, MapPin, DollarSign, Building, Trash, Trash2, ShieldAlert, MessageSquare, Cpu
 } from 'lucide-react';
 
 import AIAdvisor from './AIAdvisor';
