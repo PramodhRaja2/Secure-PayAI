@@ -898,10 +898,14 @@ async def advisor_chat(req: AdvisorRequest):
             if os.path.exists(dotenv_path):
                 with open(dotenv_path, "r") as f:
                     for line in f:
-                        if line.startswith("GITHUB_TOKEN="):
-                            github_token = line.split("=", 1)[1].strip().replace("'", "").replace('"', "")
-                            os.environ["GITHUB_TOKEN"] = github_token
-                            print("[NEURAL_HANDSHAKE] Manual parse SUCCESS.")
+                        clean_line = line.strip()
+                        if clean_line.startswith("GITHUB_TOKEN"):
+                            parts = clean_line.split("=", 1)
+                            if len(parts) == 2:
+                                github_token = parts[1].strip().replace("'", "").replace('"', "")
+                                os.environ["GITHUB_TOKEN"] = github_token
+                                print("[NEURAL_HANDSHAKE] Manual parse SUCCESS.")
+                                break
         except Exception as e:
             print(f"[NEURAL_HANDSHAKE] Manual parse CRITICAL FAILURE: {e}")
 
