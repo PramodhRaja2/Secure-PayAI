@@ -840,6 +840,7 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
 async def get_advisor_models():
     return [
         {"id": "openai/gpt-oss-120b", "name": "GPT-OSS 120B", "provider": "Groq", "icon": "⚛"},
+        {"id": "llama-3.2-11b-vision-preview", "name": "Llama 3.2 11B Vision", "provider": "Meta/Groq", "icon": "👁️"},
         {"id": "qwen/qwen3-32b", "name": "Qwen 3 32B", "provider": "Groq", "icon": "🐉"}
     ]
 
@@ -882,56 +883,43 @@ async def advisor_chat(req: AdvisorRequest):
     4. CONCISION: Provide high-density technical insights without unnecessary fluff.
     """
     
-    # Resilient Environment Loading
+    # Resilient Environment Loading with Heavy Diagnostics
     selected_model = req.model_id or "openai/gpt-oss-120b"
-    load_dotenv(dotenv_path, override=True)
+    print(f"[NEURAL_HANDSHAKE] Initializing for {selected_model}...")
     
+    load_dotenv(dotenv_path, override=True)
     api_key = os.getenv("GROQ_API_KEY")
+    
     if not api_key:
-        print(f"DEBUG: os.getenv failed. Attempting manual parse of {dotenv_path}")
+        print(f"[NEURAL_HANDSHAKE] os.getenv failed. Searching absolute path: {dotenv_path}")
         try:
             if os.path.exists(dotenv_path):
                 with open(dotenv_path, "r") as f:
                     for line in f:
                         if line.startswith("GROQ_API_KEY="):
-                            api_key = line.split("=", 1)[1].strip()
-                            # Clean potential BOM or quotes
-                            api_key = api_key.replace("'", "").replace('"', "")
+                            api_key = line.split("=", 1)[1].strip().replace("'", "").replace('"', "")
                             os.environ["GROQ_API_KEY"] = api_key
-                            print("DEBUG: Manual parse SUCCESS")
+                            print("[NEURAL_HANDSHAKE] Manual parse SUCCESS.")
         except Exception as e:
-            print(f"DEBUG: Manual parse FAILED: {e}")
+            print(f"[NEURAL_HANDSHAKE] Manual parse CRITICAL FAILURE: {e}")
 
     try:
         if not api_key:
-            raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured. Please ensure .env exists in the backend directory.")
+             raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured. Ensure .env is in the backend directory.")
             
         client = Groq(api_key=api_key)
         
-        # Model-specific Parameters
+        # Determine Model & Parameters
         params = {
             "model": selected_model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": req.message}
             ],
+            "temperature": 0.7 if "llama" in selected_model else 1.0,
+            "max_completion_tokens": 1024 if "llama" in selected_model else 8192,
             "stream": False
         }
-
-        if "qwen" in selected_model:
-            params.update({
-                "temperature": 0.6,
-                "max_completion_tokens": 4096,
-                "top_p": 0.95,
-                "reasoning_effort": "default"
-            })
-        else: # Default for GPT-OSS 120B
-            params.update({
-                "temperature": 1,
-                "max_completion_tokens": 8192,
-                "top_p": 1,
-                "reasoning_effort": "medium"
-            })
 
         completion = client.chat.completions.create(**params)
         
@@ -942,10 +930,10 @@ async def advisor_chat(req: AdvisorRequest):
         }
             
     except Exception as e:
-        print(f"Neural Connectivity Error (Groq/{selected_model}): {e}")
+        print(f"[NEURAL_ERROR] Model: {selected_model} | Error: {e}")
         raise HTTPException(status_code=500, detail=f"AI Engine Error (Groq): {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
-    print("Starting Server...")
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    print("Starting Server on http://127.0.0.1:8001 ...")
+    uvicorn.run(app, host="127.0.0.1", port=8001)
