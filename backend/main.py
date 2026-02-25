@@ -1,5 +1,6 @@
-from groq import Groq
 import os
+from groq import Groq
+from dotenv import load_dotenv
 
 # Load environment variables with absolute path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -887,6 +888,8 @@ async def advisor_chat(req: AdvisorRequest):
         if not api_key:
             raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured in environment.")
             
+        client = Groq(api_key=api_key)
+        
         # Model-specific Parameters
         params = {
             "model": selected_model,
