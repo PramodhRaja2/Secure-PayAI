@@ -250,7 +250,7 @@ const App = () => {
             const resp = await API.post('/login', { username: loginUsername, password: loginPass });
             // Response includes { token, role, name, id, region, preference }
             const userData = {
-                username: resp.data.username,
+                username: resp.data.name || resp.data.username || loginUsername,
                 role: resp.data.role,
                 name: resp.data.name,
                 id: resp.data.id,
@@ -1012,6 +1012,67 @@ const App = () => {
                         </motion.div>
                     )}
                 </AnimatePresence>
+                <AnimatePresence>
+                    {securityBlock && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[1000] flex items-center justify-center p-6"
+                        >
+                            <motion.div
+                                initial={{ scale: 0.9, y: 20 }}
+                                animate={{ scale: 1, y: 0 }}
+                                exit={{ scale: 0.9, y: 20 }}
+                                className="max-w-md w-full bg-slate-900 border border-red-500/50 rounded-3xl overflow-hidden shadow-2xl shadow-red-500/20"
+                            >
+                                <div className="bg-red-600 p-8 flex flex-col items-center text-white text-center">
+                                    <div className="bg-white/20 p-4 rounded-full mb-4 animate-pulse">
+                                        <ShieldAlert size={48} />
+                                    </div>
+                                    <h2 className="text-3xl font-black uppercase tracking-tighter mb-2">Protocol Locked</h2>
+                                    <div className="text-xs font-bold bg-white/10 px-3 py-1 rounded-full uppercase tracking-widest">
+                                        Risk Magnitude: {securityBlock.score}%
+                                    </div>
+                                </div>
+                                <div className="p-8 space-y-6">
+                                    <div className="space-y-4">
+                                        <div className="text-sm font-bold text-slate-400 uppercase tracking-widest text-center">Security Engine Result</div>
+                                        <p className="text-slate-100 text-lg leading-snug font-medium italic text-center">"{securityBlock.detail}"</p>
+
+                                        {securityBlock.aml_flags && securityBlock.aml_flags.length > 0 && (
+                                            <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl">
+                                                <div className="text-[10px] font-black uppercase text-red-500 tracking-widest mb-2">Anomalies Detected</div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {securityBlock.aml_flags.map((f, i) => (
+                                                        <span key={i} className="text-[10px] bg-red-500/20 text-red-400 px-2 py-1 rounded-md font-bold uppercase">{f}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="text-xs text-slate-400 leading-relaxed border-t border-slate-800 pt-6">
+                                        This transaction has been **DENIED** by the integrated Adaptive Guard Kernel.
+                                        The incident has been broadcast to the **Security Terminal** for manual human review and compliance verification.
+                                    </div>
+
+                                    <div className="flex flex-col gap-3 pt-4">
+                                        <button
+                                            onClick={() => setSecurityBlock(null)}
+                                            className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-slate-700 transition-all border border-slate-700"
+                                        >
+                                            Acknowledge Block
+                                        </button>
+                                        <div className="text-center">
+                                            <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest opacity-50">Status: Awaiting DevOps Override</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </main>
         </div>
     );
@@ -1443,10 +1504,14 @@ const UserManagement = ({ token, user }) => {
 
     const fetchUsers = async () => {
         try {
+            console.log("Synchronizing User Governance Registry...");
             const resp = await API.get('/admin/users', { headers: { Authorization: token } });
-            setUsers(resp.data);
+            setUsers(Array.isArray(resp.data) ? resp.data : []);
             setLoading(false);
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error("Governance Sync Failure:", e);
+            setLoading(false); // Release loading state even on error to prevent hang
+        }
     };
 
     useEffect(() => { fetchUsers(); }, []);
@@ -1520,8 +1585,8 @@ const UserManagement = ({ token, user }) => {
                                                         <Shield size={14} />
                                                     </button>
                                                 )}
-                                                {u.role !== 'dev' && (user?.role === 'dev' || u.role === 'user' || user?.id === u.id) && (
-                                                    <button onClick={() => deleteUser(u.id)} className="p-1 hover:text-red-500 transition-colors">
+                                                {u.role !== 'dev' && (
+                                                    <button onClick={() => deleteUser(u.id)} className="p-1 hover:text-red-500 transition-colors" title="Delete Account">
                                                         <X size={14} />
                                                     </button>
                                                 )}
@@ -1534,78 +1599,7 @@ const UserManagement = ({ token, user }) => {
                     </div>
                 </div>
 
-                <div className="bg-slate-900 border-t border-blue-500/10 p-6 flex justify-between items-center mt-auto">
-                    <div className="flex items-center gap-6">
-                        <div>
-                            <div className="text-[9px] uppercase opacity-40 font-black text-white tracking-[0.2em] mb-1">Architect</div>
-                            <div className="text-sm font-black text-blue-400 uppercase tracking-widest leading-none">Pramodh Raja</div>
-                        </div>
-                    </div>
-                </div>
             </div>
-
-            {/* NEW: SECURITY BLOCK MODAL */}
-            <AnimatePresence>
-                {securityBlock && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[1000] flex items-center justify-center p-6"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.9, y: 20 }}
-                            animate={{ scale: 1, y: 0 }}
-                            exit={{ scale: 0.9, y: 20 }}
-                            className="max-w-md w-full bg-slate-900 border border-red-500/50 rounded-3xl overflow-hidden shadow-2xl shadow-red-500/20"
-                        >
-                            <div className="bg-red-600 p-8 flex flex-col items-center text-white text-center">
-                                <div className="bg-white/20 p-4 rounded-full mb-4 animate-pulse">
-                                    <ShieldAlert size={48} />
-                                </div>
-                                <h2 className="text-3xl font-black uppercase tracking-tighter mb-2">Protocol Locked</h2>
-                                <div className="text-xs font-bold bg-white/10 px-3 py-1 rounded-full uppercase tracking-widest">
-                                    Risk Magnitude: {securityBlock.score}%
-                                </div>
-                            </div>
-                            <div className="p-8 space-y-6">
-                                <div className="space-y-4">
-                                    <div className="text-sm font-bold text-slate-400 uppercase tracking-widest text-center">Security Engine Result</div>
-                                    <p className="text-slate-100 text-lg leading-snug font-medium italic text-center">"{securityBlock.detail}"</p>
-
-                                    {securityBlock.aml_flags && securityBlock.aml_flags.length > 0 && (
-                                        <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl">
-                                            <div className="text-[10px] font-black uppercase text-red-500 tracking-widest mb-2">Anomalies Detected</div>
-                                            <div className="flex flex-wrap gap-2">
-                                                {securityBlock.aml_flags.map((f, i) => (
-                                                    <span key={i} className="text-[10px] bg-red-500/20 text-red-400 px-2 py-1 rounded-md font-bold uppercase">{f}</span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="text-xs text-slate-400 leading-relaxed border-t border-slate-800 pt-6">
-                                    This transaction has been **DENIED** by the integrated Adaptive Guard Kernel.
-                                    The incident has been broadcast to the **Security Terminal** for manual human review and compliance verification.
-                                </div>
-
-                                <div className="flex flex-col gap-3 pt-4">
-                                    <button
-                                        onClick={() => setSecurityBlock(null)}
-                                        className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-slate-700 transition-all border border-slate-700"
-                                    >
-                                        Acknowledge Block
-                                    </button>
-                                    <div className="text-center">
-                                        <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest opacity-50">Status: Awaiting DevOps Override</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
         </div>
     );
 };

@@ -2,7 +2,8 @@ import axios from 'axios';
 
 const API = axios.create({
     // Central Source of Truth for the Backend URL
-    baseURL: import.meta.env.VITE_API_URL || 'https://secure-payai.onrender.com',
+    // Use the Vite proxy during development, or the production URL in production
+    baseURL: import.meta.env.DEV ? '/api' : (import.meta.env.VITE_API_URL || 'https://secure-payai.onrender.com'),
     headers: {
         'Content-Type': 'application/json'
     }

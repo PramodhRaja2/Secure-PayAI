@@ -1,21 +1,12 @@
+from groq import Groq
 import os
-from dotenv import load_dotenv
-import google.generativeai as genai
-import openai
-import anthropic
 
 # Load environment variables with absolute path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 dotenv_path = os.path.join(BASE_DIR, '.env')
 load_dotenv(dotenv_path)
 
-api_key = os.getenv("GEMINI_API_KEY")
-if api_key:
-    print(f"--- QUANTUM CORE: API Key Loaded (starts with: {api_key[:10]}) ---")
-    genai.configure(api_key=api_key)
-else:
-    print("--- CRITICAL ERROR: NO GEMINI_API_KEY FOUND IN ENVIRONMENT ---")
-    print(f"Looking in: {dotenv_path}")
+# AI Engines Initialized: Claude 3.5 Sonnet & GPT-4o
 
 from fastapi import FastAPI, HTTPException, Request, Header
 from pydantic import BaseModel
@@ -134,7 +125,7 @@ class TransactionRequest(BaseModel):
 class AdvisorRequest(BaseModel):
     message: str
     user_id: int
-    model_id: Optional[str] = "gemini-2.0-flash"
+    model_id: Optional[str] = "openai/gpt-oss-120b"
 
 @app.get("/")
 async def root():
@@ -361,11 +352,21 @@ async def clear_dev_messages(authorization: str = Header(None)):
     db.close()
     return {"status": "success"}
 
+# Consolidated User Management Endpoint
 @app.get("/admin/users")
 @app.get("/dev/users")
-async def get_dev_users():
+async def get_all_users(authorization: str = Header(None)):
     db = SessionLocal()
+    requester = None
+    if authorization and authorization in sessions:
+        req_username = sessions[authorization]
+        requester = db.query(UserProfile).filter(UserProfile.username == req_username).first()
+
     users = db.query(UserProfile).all()
+    # Non-Devs cannot see Dev accounts
+    if not requester or requester.role != "dev":
+        users = [u for u in users if u.role != "dev"]
+        
     db.close()
     return [{"id": u.id, "username": u.username, "role": u.role, "is_blocked": u.is_blocked} for u in users]
 
@@ -425,20 +426,7 @@ async def wipe_database(authorization: str = Header(None)):
 
 # --- ADMIN ENDPOINTS ---
 
-@app.get("/admin/users")
-async def list_users(authorization: str = Header(None)):
-    db = SessionLocal()
-    requester = None
-    if authorization and authorization in sessions:
-        req_username = sessions[authorization]
-        requester = db.query(UserProfile).filter(UserProfile.username == req_username).first()
-
-    users = db.query(UserProfile).all()
-    if not requester or requester.role != "dev":
-        users = [u for u in users if u.role != "dev"]
-        
-    db.close()
-    return users
+# Removed duplicate /admin/users endpoint
 
 @app.post("/admin/users")
 async def create_user(req: LoginRequest):
@@ -479,14 +467,7 @@ async def toggle_user_role(user_id: int):
         db.close()
         raise HTTPException(status_code=404, detail="User not found")
     
-    if user.username == "admin":
-        db.close()
-        raise HTTPException(status_code=400, detail="Cannot modify primary admin")
-
-    if user.role == "dev":
-        db.close()
-        raise HTTPException(status_code=403, detail="Dev role cannot be changed")
-    
+    # Allow admins to promote/demote anyone except devs
     user.role = "admin" if user.role == "user" else "user"
     db.commit()
     new_role = user.role
@@ -507,13 +488,16 @@ async def delete_user(user_id: int, authorization: str = Header(None)):
         raise HTTPException(status_code=404, detail="User not found")
     
     is_dev = requester and requester.role == "dev"
+    is_admin = requester and requester.role == "admin"
+    
     if not is_dev:
         if user.role == "dev":
             db.close()
             raise HTTPException(status_code=403, detail="Protected account cannot be deleted")
-        if user.role == "admin" and (not requester or requester.id != user.id):
+        # Admins can delete anyone except other admins/devs (unless it's themselves)
+        if user.role == "admin" and requester.id != user.id:
             db.close()
-            raise HTTPException(status_code=403, detail="Admins can only delete their own admin account")
+            raise HTTPException(status_code=403, detail="Cannot delete other Administrative nodes")
     
     db.delete(user)
     db.commit()
@@ -852,11 +836,10 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
 
 @app.get("/advisor/models")
 async def get_advisor_models():
-    models = [
-        {"id": "claude-3-5-sonnet-20240620", "name": "Claude 3.5 Sonnet", "provider": "anthropic", "icon": "λ"},
-        {"id": "gpt-4o", "name": "GPT-4o (ChatGPT)", "provider": "openai", "icon": "⚛"},
+    return [
+        {"id": "openai/gpt-oss-120b", "name": "GPT-OSS 120B", "provider": "Groq", "icon": "⚛"},
+        {"id": "qwen/qwen3-32b", "name": "Qwen 3 32B", "provider": "Groq", "icon": "🐉"}
     ]
-    return models
 
 @app.post("/advisor/chat")
 async def advisor_chat(req: AdvisorRequest):
@@ -897,65 +880,49 @@ async def advisor_chat(req: AdvisorRequest):
     4. CONCISION: Provide high-density technical insights without unnecessary fluff.
     """
     
-    selected_model = req.model_id or "gemini-2.0-flash"
-    
+    # Absolute path lookup for .env to solve the "API not configured" error
+    selected_model = req.model_id or "openai/gpt-oss-120b"
     try:
-        if "gpt" in selected_model:
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise HTTPException(status_code=500, detail="OpenAI API Key not configured.")
-            client = openai.OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
-                model=selected_model,
-                messages=[{"role": "system", "content": system_prompt}]
-            )
-            return {"response": response.choices[0].message.content, "model_used": selected_model}
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured in environment.")
             
-        elif "claude" in selected_model:
-            api_key = os.getenv("ANTHROPIC_API_KEY")
-            if not api_key:
-                raise HTTPException(status_code=500, detail="Anthropic API Key not configured.")
-            client = anthropic.Anthropic(api_key=api_key)
-            message = client.messages.create(
-                model=selected_model,
-                max_tokens=1024,
-                system=system_prompt,
-                messages=[{"role": "user", "content": req.message}]
-            )
-            return {"response": message.content[0].text, "model_used": selected_model}
-            
-        else:
-            # Default to GPT-4o if model is unknown or Gemini was selected
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise HTTPException(status_code=500, detail="OpenAI API Key not configured.")
-            client = openai.OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": req.message}]
-            )
-            return {"response": response.choices[0].message.content, "model_used": "gpt-4o"}
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Neural Connectivity Error ({selected_model}): {e}")
-        # Fallback to GPT-4o if Claude/other fails
-        if selected_model != "gpt-4o":
-            try:
-                print(f"FALLBACK TRIGGERED: Attempting route to GPT-4o")
-                api_key = os.getenv("OPENAI_API_KEY")
-                if api_key:
-                    client = openai.OpenAI(api_key=api_key)
-                    response = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": req.message}]
-                    )
-                    return {"response": response.choices[0].message.content + f"\n\n[Fallback: {selected_model} unavailable, routed to GPT-4o]", "model_used": "gpt-4o"}
-            except Exception as fe:
-                print(f"Critical System Failure: {fe}")
+        # Model-specific Parameters
+        params = {
+            "model": selected_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": req.message}
+            ],
+            "stream": False
+        }
+
+        if "qwen" in selected_model:
+            params.update({
+                "temperature": 0.6,
+                "max_completion_tokens": 4096,
+                "top_p": 0.95,
+                "reasoning_effort": "default"
+            })
+        else: # Default for GPT-OSS 120B
+            params.update({
+                "temperature": 1,
+                "max_completion_tokens": 8192,
+                "top_p": 1,
+                "reasoning_effort": "medium"
+            })
+
+        completion = client.chat.completions.create(**params)
         
-        raise HTTPException(status_code=500, detail=f"AI Engine Error ({selected_model}): {str(e)}")
+        return {
+            "response": completion.choices[0].message.content, 
+            "model_used": selected_model,
+            "provider": "Groq"
+        }
+            
+    except Exception as e:
+        print(f"Neural Connectivity Error (Groq/{selected_model}): {e}")
+        raise HTTPException(status_code=500, detail=f"AI Engine Error (Groq): {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

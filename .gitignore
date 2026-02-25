@@ -10,3 +10,15 @@ __pycache__/
 # Node
 node_modules/
 dist/
+
+# Environments
+venv/
+.venv/
+env/
+.env
+
+# Tests & Diags
+ai_diag.txt
+ai_diag_utf8.txt
+backend/test_*.py
+!backend/test_groq_multi.py

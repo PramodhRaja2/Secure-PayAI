@@ -30,7 +30,7 @@ const AIAdvisor = ({ user, token, forceDarkMode = false }) => {
             try {
                 const res = await API.get('/advisor/models', { headers: { Authorization: token } });
                 setModels(res.data);
-                setCurrentModel(res.data[0]);
+                setCurrentModel(res.data.find(m => m.id === 'openai/gpt-oss-120b') || res.data[0]);
             } catch (err) {
                 console.error("Failed to load models:", err);
             } finally {
@@ -64,7 +64,7 @@ const AIAdvisor = ({ user, token, forceDarkMode = false }) => {
                 {
                     message: userMsg,
                     user_id: user.id,
-                    model_id: currentModel?.id || 'claude-3-5-sonnet-20240620'
+                    model_id: currentModel?.id || 'openai/gpt-oss-120b'
                 },
                 { headers: { Authorization: token } }
             );
