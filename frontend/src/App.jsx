@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useBiometrics } from './hooks/useBiometrics';
@@ -7,10 +7,6 @@ import {
     LineElement, Title, Tooltip, Filler,
 } from 'chart.js';
 import {
-    Shield, TrendingUp, Clock, DollarSign, Activity, Zap, MapPin, Globe,
-    Building, BarChart3, ShieldCheck, ShieldAlert, FileWarning, Lock,
-    Eye, Layers, Send, Cpu, History, Settings, MessageSquare,
-    Keyboard, MousePointer, Smartphone, Info, Menu, X,
     Loader, Download, ArrowRight, Trash, Trash2, Sun, Moon
 } from 'lucide-react';
 
@@ -306,6 +302,8 @@ const App = () => {
         try {
             const payload = {
                 ...txnData,
+                // Fraud simulation overrides — all signals maxed out
+                amount: fraudMode ? 75000 : txnData.amount,
                 typing_speed: fraudMode ? 180 : biometrics.typing_speed,
                 mouse_velocity: fraudMode ? 1200 : biometrics.mouse_velocity,
                 ip_location: fraudMode ? 'Lagos' : 'NY',
@@ -755,7 +753,7 @@ const App = () => {
             );
             case 'admin_stats': return <AdminStats token={token} />;
             case 'users': return <UserManagement token={token} user={user} />;
-            case 'alerts': return <AlertList token={token} user={user} messages={messages} setMessages={setMessages} />;
+            case 'alerts': return <ChatInterface token={token} user={user} messages={messages} setMessages={setMessages} />;
             case 'advisor': return <AIAdvisor user={user} token={token} />;
             case 'threatmap': return <div className="h-[650px] animate-in-up"><ThreatMap transactions={history} optimizerRoute={txnData} userRole={user?.role} token={token} /></div>;
             default: return renderOptimizer();
@@ -1400,42 +1398,191 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages, darkMode, to
     );
 };
 
-/* ─────────── ALERT / INBOX SYSTEM ─────────── */
-const AlertList = ({ user, token, messages, setMessages }) => {
-    const isAdmin = user.role === 'admin';
-    return (
-        <div className="animate-in-up space-y-6">
-            <div className="card">
-                <div className="card-header flex justify-between items-center">
-                    <h3>Report an Issue</h3>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-blue-500 uppercase">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                        Secure Channel to DevOps
-                    </div>
-                </div>
-                <div className="card-body">
-                    <ReportForm user={user} token={token} />
-                </div>
-            </div>
+/* ─────────── WHATSAPP-STYLE CHAT INTERFACE ─────────── */
+const ChatInterface = ({ user, token, messages, setMessages }) => {
+    const [conversations, setConversations] = useState([]);
+    const [selectedPeer, setSelectedPeer] = useState(null);
+    const [chatHistory, setChatHistory] = useState([]);
+    const [newMessage, setNewMessage] = useState('');
+    const [isSending, setIsSending] = useState(false);
+    const [allUsers, setAllUsers] = useState([]);
+    const [showUserSearch, setShowUserSearch] = useState(false);
+    const chatEndRef = useRef(null);
 
-            <div className="card">
-                <div className="card-header"><h3>Security Broadcasts</h3></div>
-                <div className="card-body">
-                    {messages.filter(m => m.type === 'info').length === 0 ? (
-                        <div className="text-center py-12 opacity-30"><Shield size={40} className="mx-auto mb-4" />No security alerts at this time.</div>
-                    ) : (
-                        <div className="space-y-4">
-                            {messages.filter(m => m.type === 'info').map((m, i) => (
-                                <div key={i} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-[10px] font-bold text-slate-400">{new Date(m.time).toLocaleString()}</span>
+    const fetchConversations = async () => {
+        try {
+            const resp = await API.get('/chat/conversations', { headers: { Authorization: token } });
+            setConversations(resp.data);
+        } catch (e) { console.error(e); }
+    };
+
+    const fetchHistory = async (peerId) => {
+        try {
+            const resp = await API.get(`/chat/history/${peerId}`, { headers: { Authorization: token } });
+            setChatHistory(resp.data);
+        } catch (e) { console.error(e); }
+    };
+
+    const fetchAllUsers = async () => {
+        try {
+            const resp = await API.get('/admin/users', { headers: { Authorization: token } });
+            setAllUsers(resp.data.filter(u => u.id !== user.id));
+        } catch (e) { console.error(e); }
+    };
+
+    useEffect(() => {
+        fetchConversations();
+        fetchAllUsers();
+    }, []);
+
+    useEffect(() => {
+        if (selectedPeer) {
+            fetchHistory(selectedPeer.id);
+        }
+    }, [selectedPeer]);
+
+    // Handle incoming real-time messages
+    useEffect(() => {
+        const latest = messages[0];
+        if (latest && latest.type === 'chat') {
+            // If it's for the current chat, add to history
+            if (selectedPeer && (latest.from_user_id === selectedPeer.id || latest.from_user_id === user.id)) {
+                setChatHistory(prev => {
+                    if (prev.find(m => m.id === latest.id)) return prev;
+                    return [...prev, latest].sort((a, b) => new Date(a.time) - new Date(b.time));
+                });
+            }
+            // Refresh conversation list
+            fetchConversations();
+        }
+    }, [messages, selectedPeer]);
+
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [chatHistory]);
+
+    const handleSend = async (e) => {
+        e.preventDefault();
+        if (!newMessage.trim() || !selectedPeer || isSending) return;
+        setIsSending(true);
+        try {
+            await API.post('/chat/send', { peer_id: selectedPeer.id, message: newMessage }, { headers: { Authorization: token } });
+            setNewMessage('');
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    return (
+        <div className="flex h-[600px] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--bg-primary)] animate-in-up">
+            {/* Conversation List */}
+            <div className="w-1/3 border-r border-[var(--border)] flex flex-col bg-slate-50 dark:bg-black/20">
+                <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+                    <h3 className="text-xs font-black uppercase tracking-widest opacity-40">Conversations</h3>
+                    <button onClick={() => setShowUserSearch(!showUserSearch)} className="p-2 hover:bg-white dark:hover:bg-white/5 rounded-lg transition-all text-blue-500">
+                        <UserPlus size={16} />
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                    {showUserSearch && (
+                        <div className="p-2 bg-blue-500/5 animate-in">
+                            <p className="text-[9px] uppercase font-bold opacity-30 px-2 mb-2">New Message</p>
+                            {allUsers.map(u => (
+                                <div key={u.id}
+                                    onClick={() => { setSelectedPeer(u); setShowUserSearch(false); }}
+                                    className="flex items-center gap-3 p-3 hover:bg-white dark:hover:bg-white/5 rounded-xl cursor-pointer transition-all">
+                                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-[10px] font-bold text-blue-500">
+                                        {u.username.charAt(0).toUpperCase()}
                                     </div>
-                                    <div className="text-sm font-medium">{m.message}</div>
+                                    <div className="text-[11px] font-bold">{u.username}</div>
                                 </div>
                             ))}
                         </div>
                     )}
+                    {conversations.length === 0 && !showUserSearch ? (
+                        <div className="text-center py-12 opacity-20 text-[10px] uppercase font-bold italic">No active threads</div>
+                    ) : (
+                        conversations.map(c => (
+                            <div key={c.id}
+                                onClick={() => setSelectedPeer(c)}
+                                className={`flex items-center gap-3 p-4 border-b border-[var(--border)] cursor-pointer transition-all ${selectedPeer?.id === c.id ? 'bg-white dark:bg-white/5 shadow-sm' : 'hover:bg-white/50 dark:hover:bg-white/2'}`}>
+                                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-xs font-bold text-emerald-500">
+                                    {c.username.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-center mb-0.5">
+                                        <span className="text-xs font-bold truncate">{c.username}</span>
+                                        <span className="text-[8px] opacity-30 font-mono tracking-tighter uppercase">{c.role}</span>
+                                    </div>
+                                    <div className="text-[10px] opacity-40 truncate">Identity Verified_Secure</div>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
+            </div>
+
+            {/* Chat Pane */}
+            <div className="flex-1 flex flex-col bg-[var(--bg-primary)]">
+                {selectedPeer ? (
+                    <>
+                        <div className="p-4 border-b border-[var(--border)] flex items-center gap-3 bg-[var(--glass)] backdrop-blur-md">
+                            <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-[10px] font-bold text-emerald-500">
+                                {selectedPeer.username.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <div className="text-xs font-bold">{selectedPeer.username}</div>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="text-[8px] opacity-50 uppercase font-black tracking-widest">Encrypted_Link_Active</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin scrollbar-thumb-blue-500/10">
+                            {chatHistory.map((m, i) => {
+                                const isMe = m.from_user_id === user.id;
+                                return (
+                                    <div key={i} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-in`}>
+                                        <div className={`max-w-[75%] p-3 rounded-2xl shadow-sm border ${isMe ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-50 dark:bg-white/5 border-[var(--border)]'}`}>
+                                            <p className="text-[11px] leading-relaxed mb-1">{m.message}</p>
+                                            <div className={`text-[7px] text-right font-mono ${isMe ? 'text-blue-200' : 'opacity-30 uppercase'}`}>
+                                                {new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div ref={chatEndRef} />
+                        </div>
+                        <form onSubmit={handleSend} className="p-4 border-t border-[var(--border)] bg-[var(--bg-primary)]">
+                            <div className="flex gap-3 bg-slate-50 dark:bg-black/20 p-2 rounded-2xl border border-[var(--border)] focus-within:border-blue-500/50 transition-all">
+                                <input
+                                    type="text"
+                                    value={newMessage}
+                                    onChange={e => setNewMessage(e.target.value)}
+                                    placeholder="Type a message..."
+                                    className="flex-1 bg-transparent border-none outline-none text-xs p-2 font-medium"
+                                />
+                                <button type="submit" disabled={!newMessage.trim() || isSending}
+                                    className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50">
+                                    <Send size={18} />
+                                </button>
+                            </div>
+                        </form>
+                    </>
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center p-12 text-center opacity-30 gap-6">
+                        <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center">
+                            <Shield size={40} className="text-blue-500" />
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-black uppercase tracking-[0.3em] mb-2">Secure Message Gateway</h4>
+                            <p className="text-[10px] max-w-xs mx-auto leading-relaxed">Select a contact or initiate a new secure bridge to exchange end-to-end encrypted packet data.</p>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

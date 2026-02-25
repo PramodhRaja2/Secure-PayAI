@@ -5,7 +5,7 @@ import API from './api';
 const AIAdvisor = ({ user, token, forceDarkMode = false }) => {
     const username = user?.username || user?.name || 'Agent';
     const [messages, setMessages] = useState([
-        { role: 'assistant', text: `Forensic handshake complete, ${username}. Quantum-Class Financial Intelligence is now online through the GitHub Models Forensic Core. How shall we optimize your security perimeter today?` }
+        { role: 'assistant', text: `Forensic handshake complete, ${username}. Quantum-Class Financial Intelligence is now online through the Groq Forensic Core (Llama 3.3 70B). How shall we optimize your security perimeter today?` }
     ]);
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -218,7 +218,7 @@ const AIAdvisor = ({ user, token, forceDarkMode = false }) => {
                             <span>Verified Architecture</span>
                         </div>
                     </div>
-                    <div className="text-[9px] text-slate-500 italic">Connected to GitHub AI Models Inference v5.0</div>
+                    <div className="text-[9px] text-slate-500 italic">Powered by Groq · {currentModel?.name || 'Llama 3.3 70B'} · Ultra-low latency inference</div>
                 </div>
             </div>
         </div>

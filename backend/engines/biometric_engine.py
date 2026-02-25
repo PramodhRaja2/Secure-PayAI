@@ -293,14 +293,14 @@ class BiometricEngine:
         # 5. Velocity Risk
         v_risk = min(40, (current_metrics.get("velocity_count", 0) * 8) + (history_velocity * 5))
         
-        # Weighted Combination Matrix (Ultra-Balanced for Production)
-        # Reduced behavioral and ML weights to prevent "hallucinated" high risk
+        # Weighted Combination Matrix (Forensic-Calibrated)
+        # Behavioral + ML are the dominant fraud signals — they drive the score
         unified_score = (
-            behavioral_score * 0.25 + 
-            ml_score * 0.20 +         
-            c_risk_score * 0.25 +     
-            amt_risk * 0.15 +         
-            v_risk * 0.15             
+            behavioral_score * 0.40 +
+            ml_score * 0.30 +
+            c_risk_score * 0.15 +
+            amt_risk * 0.10 +
+            v_risk * 0.05
         )
         
         unified_score = min(round(unified_score, 2), 100)

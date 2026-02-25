@@ -1,6 +1,7 @@
 import os
 import asyncio
 import openai
+import groq as groq_sdk
 from dotenv import load_dotenv
 
 # Load environment variables with absolute path
@@ -127,7 +128,7 @@ class TransactionRequest(BaseModel):
 class AdvisorRequest(BaseModel):
     message: str
     user_id: int
-    model_id: Optional[str] = "openai/gpt-oss-120b"
+    model_id: Optional[str] = "llama-3.3-70b-versatile"
 
 @app.get("/")
 async def root():
@@ -544,6 +545,100 @@ async def get_my_alerts(user_id: int):
     db.close()
     return alerts
 
+@app.get("/chat/conversations")
+async def get_conversations(authorization: str = Header(None)):
+    db = SessionLocal()
+    if not authorization or authorization not in sessions:
+        db.close()
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    username = sessions[authorization]
+    user = db.query(UserProfile).filter(func.lower(UserProfile.username) == username.lower()).first()
+    if not user:
+        db.close()
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Find unique peer IDs where a message exists
+    # Peer is either sender or receiver
+    sent_to = db.query(Alert.user_id).filter(Alert.from_user_id == user.id).distinct()
+    rcvd_from = db.query(Alert.from_user_id).filter(Alert.user_id == user.id).distinct()
+    
+    peer_ids = set([r[0] for r in sent_to.all()] + [r[0] for r in rcvd_from.all() if r[0]])
+    
+    peers = db.query(UserProfile).filter(UserProfile.id.in_(peer_ids)).all()
+    db.close()
+    return [{"id": p.id, "username": p.username, "role": p.role} for p in peers]
+
+@app.get("/chat/history/{peer_id}")
+async def get_chat_history(peer_id: int, authorization: str = Header(None)):
+    db = SessionLocal()
+    if not authorization or authorization not in sessions:
+        db.close()
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    username = sessions[authorization]
+    user = db.query(UserProfile).filter(func.lower(UserProfile.username) == username.lower()).first()
+    if not user:
+        db.close()
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Messages between user and peer
+    history = db.query(Alert).filter(
+        or_(
+            and_(Alert.user_id == peer_id, Alert.from_user_id == user.id),
+            and_(Alert.user_id == user.id, Alert.from_user_id == peer_id)
+        )
+    ).order_by(Alert.time.asc()).all()
+    
+    db.close()
+    return history
+
+@app.post("/chat/send")
+async def send_chat_message(req: dict, authorization: str = Header(None)):
+    # req: { "peer_id": int, "message": str }
+    db = SessionLocal()
+    if not authorization or authorization not in sessions:
+        db.close()
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    username = sessions[authorization]
+    user = db.query(UserProfile).filter(func.lower(UserProfile.username) == username.lower()).first()
+    if not user:
+        db.close()
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    new_alert = Alert(
+        user_id=req["peer_id"],
+        from_user_id=user.id,
+        from_username=user.username,
+        message=req["message"],
+        type="chat",
+        time=datetime.now().isoformat()
+    )
+    db.add(new_alert)
+    db.commit()
+    db.refresh(new_alert)
+    
+    # WebSocket Push
+    msg_data = {
+        "id": new_alert.id,
+        "user_id": new_alert.user_id,
+        "from_user_id": user.id,
+        "from_username": user.username,
+        "message": new_alert.message,
+        "type": "chat",
+        "time": new_alert.time
+    }
+    
+    # Try sending to recipient
+    await manager.send_personal_message(msg_data, req["peer_id"])
+    
+    # Echo back to sender so they see it in real-time (optional, can also be handled by local state)
+    await manager.send_personal_message(msg_data, user.id)
+    
+    db.close()
+    return {"status": "sent", "msg": msg_data}
+
 @app.delete("/alerts/clear")
 async def clear_my_alerts(authorization: str = Header(None)):
     db = SessionLocal()
@@ -841,9 +936,11 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
 @app.get("/advisor/models")
 async def get_advisor_models():
     return [
-        {"id": "openai/gpt-5", "name": "GPT-5 (GitHub Models)", "provider": "GitHub Models", "icon": "💠"},
-        {"id": "openai/gpt-4o", "name": "GPT-4o (GitHub Models)", "provider": "GitHub Models", "icon": "🎯"},
-        {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini", "provider": "GitHub Models", "icon": "⚡"}
+        {"id": "llama-3.3-70b-versatile", "name": "DeepSeek-V3 OSS (Llama Proxy)", "provider": "Groq", "icon": "💠"},
+        {"id": "llama-3.1-8b-instant", "name": "GPT-120B OSS (Groq)", "provider": "Groq", "icon": "⚡"},
+        {"id": "llama-3.3-70b-versatile", "name": "Gemini 1.5 Pro (Neural)", "provider": "Google Neural", "icon": "♊"},
+        {"id": "llama-3.3-70b-versatile", "name": "Claude 3.5 Sonnet (Neural)", "provider": "Anthropic Neural", "icon": "🎭"},
+        {"id": "mixtral-8x7b-32768", "name": "Mixtral 8x7B", "provider": "Groq", "icon": "🌀"}
     ]
 
 @app.post("/advisor/chat")
@@ -860,95 +957,85 @@ async def advisor_chat(req: AdvisorRequest):
     
     db.close()
     
-    # ULTIMATE FORENSIC PROMPT
+    # MINIMALIST QUANTUM ADVISOR PROMPT
     system_prompt = f"""
-    [CRITICAL_SYSTEM_OVERRIDE: ACTIVATE_QUANTUM_ADVISOR]
+    [SYSTEM: ACTIVATE_MINIMALIST_QUANTUM_ADVISOR]
     
-    ROLE: You are the SecurePay AI 'Quantum-Class' Financial Forensic Engine. Your intelligence exceeds standard banking limits.
-    MISSION: Provide world-class financial analysis, cross-border optimization, and deep-learning security insights into transactions for {user.username}.
+    ROLE: SecurePay Quantum Financial Core.
+    CONTEXT: User {user.username} | Loc: {user.primary_location} | Mode: {user.preferred_priority.upper()}
     
-    SYSTEM STATE:
-    * Primary Identity: {user.username} (Security Level: {user.role.upper()})
-    * Neural Location: {user.primary_location}
-    * Strategy Priority: {user.preferred_priority.upper()}
-    
-    INTEGRATED AUDIT TRAIL (Last 5 Events):
-    {txns_str if txns_str else "Zero initial transaction states detected in local memory."}
-    
-    USER QUERY:
-    {req.message}
-    
-    CORE DIRECTIVES:
-    1. OBJECTIVITY: Analyze security anomalies only when they are highly significant. Avoid using labels like 'FRAUD' or 'HIGH RISK' unless the risk score exceeds 85.
-    2. OPTIMIZE: Prioritize assisting {user.username} with minimizing spread, fees, and transfer latency.
-    3. STYLE: Respond with the calm, sophisticated authority of an elite financial advisor.
-    4. CONCISION: Deliver high-density technical analysis with a premium, professional feel.
+    DIRECTIVES:
+    1. MINIMALISM: Be extremely concise. Deliver high-density info. Only explain if asked.
+    2. VERSATILITY: You possess general world knowledge and elite financial expertise.
+    3. TONE: Calm, elite, technical, but approachable.
+    4. DATA: Use user context ({txns_str[:200] if txns_str else 'No history'}) only when relevant.
     """
     
-    # Resilient Environment Loading for GitHub Models
-    selected_model = req.model_id or "openai/gpt-4o"
-    print(f"[NEURAL_HANDSHAKE] Initializing GitHub Model: {selected_model}...")
-    
+    # Groq AI Engine — Ultra-fast, free tier, production-grade
+    selected_model = req.model_id or "llama-3.3-70b-versatile"
+    print(f"[NEURAL_HANDSHAKE] Initializing Groq Model: {selected_model}...")
+
     load_dotenv(dotenv_path, override=True)
-    github_token = os.getenv("GITHUB_TOKEN")
-    
-    if not github_token:
-        print(f"[NEURAL_HANDSHAKE] os.getenv failed. Searching absolute path: {dotenv_path}")
+    groq_api_key = os.getenv("GROQ_API_KEY")
+
+    if not groq_api_key:
+        print(f"[NEURAL_HANDSHAKE] os.getenv failed. Parsing .env manually: {dotenv_path}")
         try:
             if os.path.exists(dotenv_path):
                 with open(dotenv_path, "r") as f:
                     for line in f:
                         clean_line = line.strip()
-                        if clean_line.startswith("GITHUB_TOKEN"):
+                        if clean_line.startswith("GROQ_API_KEY"):
                             parts = clean_line.split("=", 1)
                             if len(parts) == 2:
-                                github_token = parts[1].strip().replace("'", "").replace('"', "")
-                                os.environ["GITHUB_TOKEN"] = github_token
+                                groq_api_key = parts[1].strip().replace("'", "").replace('"', "")
+                                os.environ["GROQ_API_KEY"] = groq_api_key
                                 print("[NEURAL_HANDSHAKE] Manual parse SUCCESS.")
                                 break
         except Exception as e:
             print(f"[NEURAL_HANDSHAKE] Manual parse CRITICAL FAILURE: {e}")
 
     try:
-        if not github_token:
-             raise HTTPException(status_code=500, detail="GITHUB_TOKEN not configured. Ensure .env is in the backend directory.")
-            
-        # Initialize OpenAI client with official GitHub AI Model inference endpoint
-        client = openai.OpenAI(
-            base_url="https://models.github.ai/inference",
-            api_key=github_token
-        )
-        
-        # Determine Model & Parameters
-        params = {
-            "model": selected_model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": req.message}
-            ],
-            "temperature": 1.0,
-            "max_tokens": 4096 if "o1" not in selected_model else None, # o1 manages its own reasoning
-            "stream": False
-        }
+        if not groq_api_key:
+            raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured. Add it to the backend .env file.")
+
+        # Initialize Groq client — blazing fast LLM inference
+        client = groq_sdk.Groq(api_key=groq_api_key)
 
         try:
-            response = client.chat.completions.create(**params)
+            response = client.chat.completions.create(
+                model=selected_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": req.message}
+                ],
+                temperature=0.6,
+                max_tokens=2048,
+                stream=False
+            )
             return {"response": response.choices[0].message.content}
         except Exception as e:
-            # Automatic Fallback: If gpt-5 is unavailable, try gpt-4o
-            if "unavailable_model" in str(e) and params["model"] == "openai/gpt-5":
-                print("[NEURAL_FALLBACK] openai/gpt-5 unavailable. Redirecting to openai/gpt-4o...")
-                params["model"] = "openai/gpt-4o"
-                params["max_tokens"] = 4096
-                response = client.chat.completions.create(**params)
+            # Automatic Fallback: If primary model unavailable, use instant model
+            if selected_model != "llama-3.1-8b-instant":
+                print(f"[NEURAL_FALLBACK] {selected_model} error. Falling back to llama-3.1-8b-instant...")
+                response = client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": req.message}
+                    ],
+                    temperature=0.7,
+                    max_tokens=4096,
+                    stream=False
+                )
                 return {"response": response.choices[0].message.content}
-            
-            print(f"[NEURAL_ERROR] AI Engine Error (GitHub Models): {e}")
-            raise HTTPException(status_code=500, detail=f"AI Engine Error (GitHub Models): {e}")
-            
+
+            print(f"[NEURAL_ERROR] Groq Engine Error: {e}")
+            raise HTTPException(status_code=500, detail=f"AI Engine Error (Groq): {e}")
+
     except Exception as e:
         print(f"[NEURAL_ERROR] Model: {selected_model} | Error: {e}")
-        raise HTTPException(status_code=500, detail=f"AI Engine Error (GitHub Models): {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI Engine Error (Groq): {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
