@@ -882,15 +882,29 @@ async def advisor_chat(req: AdvisorRequest):
     4. CONCISION: Provide high-density technical insights without unnecessary fluff.
     """
     
-    # Absolute path lookup for .env to solve the "API not configured" error
+    # Resilient Environment Loading
     selected_model = req.model_id or "openai/gpt-oss-120b"
     load_dotenv(dotenv_path, override=True)
     
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        print(f"DEBUG: os.getenv failed. Attempting manual parse of {dotenv_path}")
+        try:
+            if os.path.exists(dotenv_path):
+                with open(dotenv_path, "r") as f:
+                    for line in f:
+                        if line.startswith("GROQ_API_KEY="):
+                            api_key = line.split("=", 1)[1].strip()
+                            # Clean potential BOM or quotes
+                            api_key = api_key.replace("'", "").replace('"', "")
+                            os.environ["GROQ_API_KEY"] = api_key
+                            print("DEBUG: Manual parse SUCCESS")
+        except Exception as e:
+            print(f"DEBUG: Manual parse FAILED: {e}")
+
     try:
-        api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
-            print(f"CRITICAL: GROQ_API_KEY lookup failed. Loaded path: {dotenv_path}")
-            raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured in environment.")
+            raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured. Please ensure .env exists in the backend directory.")
             
         client = Groq(api_key=api_key)
         

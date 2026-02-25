@@ -210,8 +210,8 @@ const App = () => {
     useEffect(() => {
         if (!user || !token) return;
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = API.defaults.baseURL.replace('http://', '').replace('https://', '');
-        const ws = new WebSocket(`${protocol}//${host}/ws/${token}`);
+        const wsUrl = `${protocol}//${window.location.host}/api/ws/${token}`;
+        const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => setWsConnected(true);
         ws.onmessage = (event) => {
