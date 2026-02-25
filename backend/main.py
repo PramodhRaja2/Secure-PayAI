@@ -1,4 +1,5 @@
 import os
+import asyncio
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -883,9 +884,12 @@ async def advisor_chat(req: AdvisorRequest):
     
     # Absolute path lookup for .env to solve the "API not configured" error
     selected_model = req.model_id or "openai/gpt-oss-120b"
+    load_dotenv(dotenv_path, override=True)
+    
     try:
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
+            print(f"CRITICAL: GROQ_API_KEY lookup failed. Loaded path: {dotenv_path}")
             raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured in environment.")
             
         client = Groq(api_key=api_key)
