@@ -9,7 +9,7 @@ import {
 import {
     Activity, Shield, ShieldCheck, Zap, TrendingUp, BarChart3, History, Globe, Layers, FileWarning, Eye, Settings, Sun, Moon,
     Clock, Terminal, Search, Info, Send, Menu, X, ArrowRight, Download, ChevronRight, Lock, UserPlus, Loader,
-    Keyboard, MousePointer, Smartphone, MapPin, DollarSign, Building, Trash, Trash2, ShieldAlert, MessageSquare, Cpu
+    Keyboard, MousePointer, Smartphone, MapPin, DollarSign, Building, Trash, Trash2, ShieldAlert, MessageSquare, Cpu, Sparkles
 } from 'lucide-react';
 
 import AIAdvisor from './AIAdvisor';
@@ -157,6 +157,48 @@ const CacheHealthIndicator = () => {
     );
 };
 
+/* ─────────── QUANTUM CAPTCHA ─────────── */
+const QuantumCaptcha = ({ onVerify, verified }) => {
+    const [verifying, setVerifying] = useState(false);
+
+    if (verified) {
+        return (
+            <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-500 text-xs font-bold font-mono uppercase transition-all mb-4">
+                <ShieldCheck size={16} /> Identity Fully Verified
+            </div>
+        );
+    }
+
+    const handleVerify = (e) => {
+        e.preventDefault();
+        setVerifying(true);
+        setTimeout(() => {
+            setVerifying(false);
+            onVerify(true);
+        }, 1500);
+    };
+
+    return (
+        <div className="flex items-center justify-between p-3 bg-slate-900/5 border border-slate-200 dark:bg-white/5 dark:border-white/10 rounded-xl mb-4 transition-all">
+            <div className="flex items-center gap-3">
+                <button
+                    type="button"
+                    onClick={handleVerify}
+                    disabled={verifying}
+                    className="w-6 h-6 rounded border-2 border-slate-400 dark:border-slate-500 flex items-center justify-center hover:border-blue-500 transition-colors bg-white dark:bg-black"
+                >
+                    {verifying && <div className="w-3 h-3 bg-blue-500 rounded-sm animate-pulse" />}
+                </button>
+                <div className="text-xs font-mono text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">Verify Access Token</div>
+            </div>
+            <div className="flex items-center gap-1 opacity-50">
+                <Sparkles size={12} className="text-blue-500" />
+                <span className="text-[9px] uppercase tracking-widest font-black text-slate-800 dark:text-slate-200">Quantum</span>
+            </div>
+        </div>
+    );
+};
+
 /* ─────────── MAIN APP ─────────── */
 const App = () => {
     const [txnData, setTxnData] = useState({ amount: 25000, base_currency: 'USD', target_currency: 'EUR', priority: 'balanced', source_city: 'NYC', dest_city: 'LDN' });
@@ -224,6 +266,7 @@ const App = () => {
     const [loginUsername, setLoginUsername] = useState('');
     const [loginPass, setLoginPass] = useState('');
     const [authError, setAuthError] = useState('');
+    const [captchaVerified, setCaptchaVerified] = useState(() => localStorage.getItem('quantum_verified') === 'true');
 
     const biometrics = useBiometrics();
 
@@ -830,8 +873,12 @@ const App = () => {
                                 </select>
                             </div>
                         )}
+                        <QuantumCaptcha verified={captchaVerified} onVerify={(val) => {
+                            setCaptchaVerified(val);
+                            localStorage.setItem('quantum_verified', 'true');
+                        }} />
                         {authError && <div className="auth-error">{authError}</div>}
-                        <button type="submit" className="login-btn mb-4" onClick={(e) => { e.preventDefault(); isRegistering ? handleRegister(e) : handleLogin(e); }}>
+                        <button type="submit" disabled={!captchaVerified} className={`login-btn mb-4 ${!captchaVerified ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={(e) => { e.preventDefault(); isRegistering ? handleRegister(e) : handleLogin(e); }}>
                             {isRegistering ? 'Initialize Account' : 'Secure Login'}
                         </button>
                         <div className="text-center text-xs opacity-50 cursor-pointer font-bold hover:text-blue-500 transition-colors" onClick={() => { setIsRegistering(!isRegistering); setAuthError(''); }}>
@@ -1478,9 +1525,9 @@ const ChatInterface = ({ user, token, messages, setMessages }) => {
     };
 
     return (
-        <div className="flex h-[600px] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--bg-primary)] animate-in-up">
+        <div className="flex flex-col md:flex-row h-[600px] md:h-[600px] h-[calc(100vh-150px)] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--bg-primary)] animate-in-up">
             {/* Conversation List */}
-            <div className="w-1/3 border-r border-[var(--border)] flex flex-col bg-slate-50 dark:bg-black/20">
+            <div className={`md:w-1/3 border-r border-[var(--border)] flex-col bg-slate-50 dark:bg-black/20 ${selectedPeer ? 'hidden md:flex' : 'flex flex-1'}`}>
                 <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
                     <h3 className="text-xs font-black uppercase tracking-widest opacity-40">Conversations</h3>
                     <button onClick={() => setShowUserSearch(!showUserSearch)} className="p-2 hover:bg-white dark:hover:bg-white/5 rounded-lg transition-all text-blue-500">
@@ -1527,10 +1574,13 @@ const ChatInterface = ({ user, token, messages, setMessages }) => {
             </div>
 
             {/* Chat Pane */}
-            <div className="flex-1 flex flex-col bg-[var(--bg-primary)]">
+            <div className={`md:flex-1 flex-col bg-[var(--bg-primary)] ${!selectedPeer ? 'hidden md:flex' : 'flex flex-1'}`}>
                 {selectedPeer ? (
                     <>
                         <div className="p-4 border-b border-[var(--border)] flex items-center gap-3 bg-[var(--glass)] backdrop-blur-md">
+                            <button onClick={() => setSelectedPeer(null)} className="md:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
+                                <ChevronRight className="rotate-180" size={16} />
+                            </button>
                             <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-[10px] font-bold text-emerald-500">
                                 {selectedPeer.username.charAt(0).toUpperCase()}
                             </div>

@@ -995,9 +995,20 @@ async def advisor_chat(req: AdvisorRequest):
         except Exception as e:
             print(f"[NEURAL_HANDSHAKE] Manual parse CRITICAL FAILURE: {e}")
 
+    if not groq_api_key:
+        print(f"[NEURAL_HANDSHAKE] FINAL ATTEMPT. Current Env Keys: {list(os.environ.keys())[:10]}")
+        # Last resort: try reading .env from current directory too
+        if os.path.exists(".env"):
+             with open(".env", "r") as f:
+                for line in f:
+                    if line.startswith("GROQ_API_KEY"):
+                        groq_api_key = line.split("=", 1)[1].strip().replace("'", "").replace('"', "")
+                        os.environ["GROQ_API_KEY"] = groq_api_key
+                        break
+
     try:
         if not groq_api_key:
-            raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured. Add it to the backend .env file.")
+            raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured. Please ensure it exists in backend/.env")
 
         # Initialize Groq client — blazing fast LLM inference
         client = groq_sdk.Groq(api_key=groq_api_key)
@@ -1039,5 +1050,8 @@ async def advisor_chat(req: AdvisorRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    print("Starting Server on http://127.0.0.1:8001 ...")
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    # Bind to 0.0.0.0 to allow access from local network (iPhone)
+    cli_host = "0.0.0.0"
+    cli_port = 8001
+    print(f"🚀 Quantum Gateway Online: http://{cli_host}:{cli_port}")
+    uvicorn.run(app, host=cli_host, port=cli_port)

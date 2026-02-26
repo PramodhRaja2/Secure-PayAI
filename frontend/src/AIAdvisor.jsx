@@ -76,7 +76,7 @@ const AIAdvisor = ({ user, token, forceDarkMode = false }) => {
         <div className={`relative transition-all duration-500 ease-in-out ${isExpanded ? 'fixed inset-4 z-50 h-auto' : 'h-[650px] w-full'} flex flex-col rounded-3xl overflow-hidden glass-morphism border ${forceDarkMode ? 'bg-slate-950/40 border-slate-700/50' : 'bg-white/40 border-slate-200/50 dark:bg-slate-950/40 dark:border-slate-800/50 shadow-2xl backdrop-blur-xl'}`}>
 
             {/* Header: V0 Premium Design */}
-            <div className="bg-slate-900/90 backdrop-blur-md text-white p-5 flex justify-between items-center border-b border-white/5 shrink-0">
+            <div className="relative z-50 bg-slate-900/90 backdrop-blur-md text-white p-5 flex justify-between items-center border-b border-white/5 shrink-0">
                 <div className="flex items-center gap-4">
                     <div className="relative">
                         <div className="bg-emerald-500/20 p-2.5 rounded-xl text-emerald-400 border border-emerald-500/30">
@@ -112,7 +112,7 @@ const AIAdvisor = ({ user, token, forceDarkMode = false }) => {
                         </button>
 
                         {showModelPicker && (
-                            <div className="absolute top-full right-0 mt-3 w-64 bg-slate-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 overflow-hidden animate-in-up">
+                            <div className="absolute top-full right-0 mt-3 w-64 bg-slate-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[100] overflow-hidden animate-in-up">
                                 <div className="p-3 border-b border-white/5 text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em] px-5">Available Intelligence Cores</div>
                                 {models.map((m) => (
                                     <button
