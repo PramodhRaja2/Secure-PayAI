@@ -319,13 +319,39 @@ async def review_transaction(txn_id: int, payload: dict):
     if action == "approve":
         txn.approved = True
         txn.status = "dev_approved"
+        msg = f"Transaction approved: {txn.amount} {txn.base_currency} -> {txn.target_currency} has been cleared for processing."
     elif action == "deny":
         txn.approved = False
         txn.status = "dev_denied"
+        msg = f"Transaction denied: {txn.amount} {txn.base_currency} -> {txn.target_currency} was blocked by compliance."
     else:
         db.close()
         raise HTTPException(status_code=400, detail="Invalid action. Use 'approve' or 'deny'.")
-    db.commit()
+
+    # Create automated notification for the user
+    if txn.user_id:
+        new_alert = Alert(
+            user_id=txn.user_id,
+            from_username="SECURITY_KERNEL",
+            type="info",
+            message=msg,
+            time=datetime.now().isoformat()
+        )
+        db.add(new_alert)
+        db.commit()
+        db.refresh(new_alert)
+        
+        # Real-time WebSocket Push
+        asyncio.create_task(manager.send_personal_message({
+            "id": new_alert.id,
+            "user_id": new_alert.user_id,
+            "message": new_alert.message,
+            "type": "info",
+            "time": new_alert.time
+        }, txn.user_id))
+    else:
+        db.commit()
+
     db.close()
     return {"status": "success", "action": action, "txn_id": txn_id}
 
