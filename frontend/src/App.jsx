@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useBiometrics } from './hooks/useBiometrics';
@@ -1207,9 +1207,8 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages, darkMode, to
         try {
             await API.delete('/admin/clear-ledger', { headers: { Authorization: token } });
             alert("Data wipe initiated successfully.");
-            if (typeof setStats === 'function') setStats(prev => ({ ...prev, total_transactions: 0, pending: 0 }));
+            setStats(prev => prev ? { ...prev, total_transactions: 0, pending: 0 } : null);
             setPending([]);
-            setHistory([]);
             setMessages([]);
         } catch (e) { alert(e.response?.data?.detail || "Data wipe failed"); }
     };
