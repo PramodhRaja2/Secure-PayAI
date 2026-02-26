@@ -1,15 +1,26 @@
 import os
 import asyncio
-import openai
 import groq as groq_sdk
 from dotenv import load_dotenv
 
-# Load environment variables with absolute path
+# Load environment variables with absolute path — works locally
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 dotenv_path = os.path.join(BASE_DIR, '.env')
 load_dotenv(dotenv_path)
 
-# AI Engines Initialized: Claude 3.5 Sonnet & GPT-4o
+# Cache GROQ_API_KEY globally at startup (fixes Render/production where no .env exists)
+GROQ_KEY = os.environ.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY", "")
+if not GROQ_KEY:
+    # Fallback: read directly from .env file (local dev)
+    try:
+        with open(dotenv_path, "r") as _f:
+            for _line in _f:
+                if _line.startswith("GROQ_API_KEY"):
+                    GROQ_KEY = _line.split("=", 1)[1].strip().strip("'\"")
+                    break
+    except Exception:
+        pass
+print(f"[STARTUP] GROQ_KEY loaded: {'YES' if GROQ_KEY else 'MISSING - Set GROQ_API_KEY env var on Render!'}")
 
 from fastapi import FastAPI, HTTPException, Request, Header
 from pydantic import BaseModel
@@ -545,6 +556,20 @@ async def get_my_alerts(user_id: int):
     db.close()
     return alerts
 
+# Returns ALL users (including dev) for the chat contact picker
+@app.get("/chat/users")
+async def get_chat_users(authorization: str = Header(None)):
+    db = SessionLocal()
+    if not authorization or authorization not in sessions:
+        db.close()
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    current_username = sessions[authorization]
+    current_user = db.query(UserProfile).filter(func.lower(UserProfile.username) == current_username.lower()).first()
+    all_users = db.query(UserProfile).all()
+    db.close()
+    # Return all users except self
+    return [{"id": u.id, "username": u.username, "role": u.role} for u in all_users if current_user and u.id != current_user.id]
+
 @app.get("/chat/conversations")
 async def get_conversations(authorization: str = Header(None)):
     db = SessionLocal()
@@ -936,11 +961,12 @@ async def analyze_transaction(request: TransactionRequest, req: Request):
 @app.get("/advisor/models")
 async def get_advisor_models():
     return [
-        {"id": "llama-3.3-70b-versatile", "name": "DeepSeek-V3 OSS (Llama Proxy)", "provider": "Groq", "icon": "💠"},
-        {"id": "llama-3.1-8b-instant", "name": "GPT-120B OSS (Groq)", "provider": "Groq", "icon": "⚡"},
-        {"id": "llama-3.3-70b-versatile", "name": "Gemini 1.5 Pro (Neural)", "provider": "Google Neural", "icon": "♊"},
-        {"id": "llama-3.3-70b-versatile", "name": "Claude 3.5 Sonnet (Neural)", "provider": "Anthropic Neural", "icon": "🎭"},
-        {"id": "mixtral-8x7b-32768", "name": "Mixtral 8x7B", "provider": "Groq", "icon": "🌀"}
+        {"id": "llama-3.3-70b-versatile",  "name": "Llama 3.3 70B",          "provider": "Meta / Groq",       "icon": "🦙"},
+        {"id": "llama-3.1-8b-instant",      "name": "Llama 3.1 8B Instant",   "provider": "Meta / Groq",       "icon": "⚡"},
+        {"id": "mixtral-8x7b-32768",        "name": "ChatGPT OSS (Mixtral)",   "provider": "Mistral / Groq",    "icon": "🤖"},
+        {"id": "qwen-qwq-32b",              "name": "Qwen QwQ 32B",           "provider": "Alibaba / Groq",    "icon": "🇨🇳"},
+        {"id": "llama-3.3-70b-versatile",  "name": "Claude 3.5 (Neural)",     "provider": "Anthropic Proxy",   "icon": "🎭"},
+        {"id": "llama-3.3-70b-versatile",  "name": "GPT-4o OSS (Neural)",     "provider": "OpenAI Proxy",      "icon": "💡"},
     ]
 
 @app.post("/advisor/chat")
@@ -957,60 +983,34 @@ async def advisor_chat(req: AdvisorRequest):
     
     db.close()
     
-    # MINIMALIST QUANTUM ADVISOR PROMPT
-    system_prompt = f"""
-    [SYSTEM: ACTIVATE_MINIMALIST_QUANTUM_ADVISOR]
-    
-    ROLE: SecurePay Quantum Financial Core.
-    CONTEXT: User {user.username} | Loc: {user.primary_location} | Mode: {user.preferred_priority.upper()}
-    
-    DIRECTIVES:
-    1. MINIMALISM: Be extremely concise. Deliver high-density info. Only explain if asked.
-    2. VERSATILITY: You possess general world knowledge and elite financial expertise.
-    3. TONE: Calm, elite, technical, but approachable.
-    4. DATA: Use user context ({txns_str[:200] if txns_str else 'No history'}) only when relevant.
-    """
-    
-    # Groq AI Engine — Ultra-fast, free tier, production-grade
+    # Role-based AI Persona — adapts to who is asking
+    role = user.role if user.role else "user"
+    if role == "dev":
+        system_prompt = f"""You are an elite senior DevOps & software engineering expert with broad general knowledge.
+USER: {user.username} | Region: {user.primary_location}
+Recent txns: {txns_str[:200] if txns_str else 'None'}
+DIRECTIVES:
+- Prioritize coding, DevOps, system design, debugging, and architecture.
+- Also help with daily life, productivity, and general questions.
+- Be concise, direct, technical. Use code snippets when helpful."""
+    else:
+        system_prompt = f"""You are an elite financial advisor and knowledgeable life assistant.
+USER: {user.username} | Region: {user.primary_location} | Mode: {user.preferred_priority.upper()}
+Recent txns: {txns_str[:300] if txns_str else 'None'}
+DIRECTIVES:
+- Prioritize financial insights, payments, FX, fraud, budgeting, investment.
+- Also help with general daily life questions naturally.
+- Be concise and precise. Avoid excessive disclaimers."""
+
+    # Groq AI Engine — Use globally cached key
     selected_model = req.model_id or "llama-3.3-70b-versatile"
-    print(f"[NEURAL_HANDSHAKE] Initializing Groq Model: {selected_model}...")
-
-    load_dotenv(dotenv_path, override=True)
-    groq_api_key = os.getenv("GROQ_API_KEY")
-
-    if not groq_api_key:
-        print(f"[NEURAL_HANDSHAKE] os.getenv failed. Parsing .env manually: {dotenv_path}")
-        try:
-            if os.path.exists(dotenv_path):
-                with open(dotenv_path, "r") as f:
-                    for line in f:
-                        clean_line = line.strip()
-                        if clean_line.startswith("GROQ_API_KEY"):
-                            parts = clean_line.split("=", 1)
-                            if len(parts) == 2:
-                                groq_api_key = parts[1].strip().replace("'", "").replace('"', "")
-                                os.environ["GROQ_API_KEY"] = groq_api_key
-                                print("[NEURAL_HANDSHAKE] Manual parse SUCCESS.")
-                                break
-        except Exception as e:
-            print(f"[NEURAL_HANDSHAKE] Manual parse CRITICAL FAILURE: {e}")
-
-    if not groq_api_key:
-        print(f"[NEURAL_HANDSHAKE] FINAL ATTEMPT. Current Env Keys: {list(os.environ.keys())[:10]}")
-        # Last resort: try reading .env from current directory too
-        if os.path.exists(".env"):
-             with open(".env", "r") as f:
-                for line in f:
-                    if line.startswith("GROQ_API_KEY"):
-                        groq_api_key = line.split("=", 1)[1].strip().replace("'", "").replace('"', "")
-                        os.environ["GROQ_API_KEY"] = groq_api_key
-                        break
+    groq_api_key = GROQ_KEY
+    print(f"[NEURAL_HANDSHAKE] Model: {selected_model} | Role: {role} | Key: {'OK' if groq_api_key else 'MISSING'}")
 
     try:
         if not groq_api_key:
-            raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured. Please ensure it exists in backend/.env")
+            raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured. Add it to Render environment variables.")
 
-        # Initialize Groq client — blazing fast LLM inference
         client = groq_sdk.Groq(api_key=groq_api_key)
 
         try:

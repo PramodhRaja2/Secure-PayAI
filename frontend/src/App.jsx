@@ -157,43 +157,74 @@ const CacheHealthIndicator = () => {
     );
 };
 
-/* ─────────── QUANTUM CAPTCHA ─────────── */
+/* ─────────── CLOUDFLARE-STYLE CAPTCHA ─────────── */
 const QuantumCaptcha = ({ onVerify, verified }) => {
-    const [verifying, setVerifying] = useState(false);
+    const [state, setState] = useState(verified ? 'done' : 'idle');
 
-    if (verified) {
-        return (
-            <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-500 text-xs font-bold font-mono uppercase transition-all mb-4">
-                <ShieldCheck size={16} /> Identity Fully Verified
-            </div>
-        );
-    }
-
-    const handleVerify = (e) => {
-        e.preventDefault();
-        setVerifying(true);
+    const handleVerify = () => {
+        if (state !== 'idle') return;
+        setState('scanning');
         setTimeout(() => {
-            setVerifying(false);
+            setState('done');
             onVerify(true);
-        }, 1500);
+            localStorage.setItem('quantum_verified', 'true');
+        }, 2000);
     };
 
     return (
-        <div className="flex items-center justify-between p-3 bg-slate-900/5 border border-slate-200 dark:bg-white/5 dark:border-white/10 rounded-xl mb-4 transition-all">
-            <div className="flex items-center gap-3">
-                <button
-                    type="button"
-                    onClick={handleVerify}
-                    disabled={verifying}
-                    className="w-6 h-6 rounded border-2 border-slate-400 dark:border-slate-500 flex items-center justify-center hover:border-blue-500 transition-colors bg-white dark:bg-black"
-                >
-                    {verifying && <div className="w-3 h-3 bg-blue-500 rounded-sm animate-pulse" />}
-                </button>
-                <div className="text-xs font-mono text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">Verify Access Token</div>
+        <div onClick={handleVerify} style={{
+            border: '1px solid #d1d5db',
+            borderRadius: '4px',
+            background: '#f9fafb',
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '16px',
+            cursor: state === 'idle' ? 'pointer' : 'default',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            userSelect: 'none',
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                    width: '24px', height: '24px',
+                    border: `2px solid ${state === 'done' ? '#16a34a' : state === 'scanning' ? '#2563eb' : '#9ca3af'}`,
+                    borderRadius: '3px',
+                    background: state === 'done' ? '#16a34a' : '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.3s ease',
+                    flexShrink: 0,
+                }}>
+                    {state === 'scanning' && (
+                        <div style={{
+                            width: '13px', height: '13px',
+                            border: '2px solid #2563eb',
+                            borderTopColor: 'transparent',
+                            borderRadius: '50%',
+                            animation: 'spin 0.8s linear infinite',
+                        }} />
+                    )}
+                    {state === 'done' && (
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                            <path d="M2.5 7L5.5 10L11.5 4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    )}
+                </div>
+                <span style={{
+                    fontSize: '14px', fontFamily: 'system-ui, sans-serif',
+                    color: state === 'done' ? '#166534' : '#374151',
+                    fontWeight: state === 'done' ? '500' : '400',
+                }}>
+                    {state === 'idle' ? 'I am human' : state === 'scanning' ? 'Verifying...' : 'Verified'}
+                </span>
             </div>
-            <div className="flex items-center gap-1 opacity-50">
-                <Sparkles size={12} className="text-blue-500" />
-                <span className="text-[9px] uppercase tracking-widest font-black text-slate-800 dark:text-slate-200">Quantum</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                <svg width="28" height="28" viewBox="0 0 128 128" fill="none">
+                    <path d="M64 0C28.7 0 0 28.7 0 64s28.7 64 64 64 64-28.7 64-64S99.3 0 64 0z" fill="#F38020" />
+                    <path d="M80.5 52H47.5C44.4 52 42 54.4 42 57.5s2.4 5.5 5.5 5.5h33c3.1 0 5.5-2.4 5.5-5.5S83.6 52 80.5 52z" fill="white" />
+                    <path d="M88 68.5H40c-1.9 0-3.5 1.6-3.5 3.5s1.6 3.5 3.5 3.5h48c1.9 0 3.5-1.6 3.5-3.5S89.9 68.5 88 68.5z" fill="white" opacity="0.7" />
+                </svg>
+                <span style={{ fontSize: '9px', color: '#9ca3af', letterSpacing: '0.02em', fontFamily: 'system-ui' }}>Cloudflare</span>
             </div>
         </div>
     );
@@ -1399,10 +1430,6 @@ const DevConsole = ({ user, token, onLogout, messages, setMessages, darkMode, to
                                                 {u.is_blocked ? 'LOCKED' : 'ACTIVE'}
                                             </span>
                                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => {
-                                                    const msg = window.prompt("Direct message:");
-                                                    if (msg) API.post('/admin/alerts', { user_id: u.id, message: msg, type: 'info' }, { headers: { Authorization: token } });
-                                                }} className="p-1 hover:text-emerald-400 transition-colors" title="Message"><Send size={12} /></button>
                                                 <button onClick={async () => {
                                                     try { await API.patch(`/admin/users/${u.id}/block`, {}, { headers: { Authorization: token } }); const resp = await API.get('/admin/users', { headers: { Authorization: token } }); setUsers(resp.data); } catch (e) { console.error(e); }
                                                 }} className="p-1 hover:text-orange-400 transition-colors" title={u.is_blocked ? "Unblock" : "Block"}><Lock size={12} className={u.is_blocked ? "text-red-500" : ""} /></button>
@@ -1474,8 +1501,8 @@ const ChatInterface = ({ user, token, messages, setMessages }) => {
 
     const fetchAllUsers = async () => {
         try {
-            const resp = await API.get('/admin/users', { headers: { Authorization: token } });
-            setAllUsers(resp.data.filter(u => u.id !== user.id));
+            const resp = await API.get('/chat/users', { headers: { Authorization: token } });
+            setAllUsers(resp.data);
         } catch (e) { console.error(e); }
     };
 
