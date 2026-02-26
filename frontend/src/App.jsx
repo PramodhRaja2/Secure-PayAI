@@ -1536,15 +1536,41 @@ const ChatInterface = ({ user, token, messages, setMessages }) => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [chatHistory]);
 
+    // Poll for new messages every 3s while a conversation is open
+    useEffect(() => {
+        if (!selectedPeer) return;
+        const interval = setInterval(() => fetchHistory(selectedPeer.id), 3000);
+        return () => clearInterval(interval);
+    }, [selectedPeer]);
+
     const handleSend = async (e) => {
         e.preventDefault();
         if (!newMessage.trim() || !selectedPeer || isSending) return;
+        const msgText = newMessage.trim();
+        setNewMessage('');
+
+        // Optimistic update — show message instantly without waiting for server
+        const optimisticMsg = {
+            id: `tmp_${Date.now()}`,
+            from_user_id: user.id,
+            from_username: user.username,
+            user_id: selectedPeer.id,
+            message: msgText,
+            type: 'chat',
+            time: new Date().toISOString(),
+        };
+        setChatHistory(prev => [...prev, optimisticMsg]);
+
         setIsSending(true);
         try {
-            await API.post('/chat/send', { peer_id: selectedPeer.id, message: newMessage }, { headers: { Authorization: token } });
-            setNewMessage('');
-        } catch (e) {
-            console.error(e);
+            await API.post('/chat/send', { peer_id: selectedPeer.id, message: msgText }, { headers: { Authorization: token } });
+            // Fetch fresh history to replace optimistic msg with real one
+            fetchHistory(selectedPeer.id);
+            fetchConversations();
+        } catch (err) {
+            console.error(err);
+            // Rollback on failure
+            setChatHistory(prev => prev.filter(m => m.id !== optimisticMsg.id));
         } finally {
             setIsSending(false);
         }
