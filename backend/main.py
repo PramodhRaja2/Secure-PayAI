@@ -1053,5 +1053,5 @@ if __name__ == "__main__":
     # Bind to 0.0.0.0 to allow access from local network (iPhone)
     cli_host = "0.0.0.0"
     cli_port = 8001
-    print(f"🚀 Quantum Gateway Online: http://{cli_host}:{cli_port}")
+    print(f"Quantum Gateway Online: http://{cli_host}:{cli_port}")
     uvicorn.run(app, host=cli_host, port=cli_port)
