@@ -779,7 +779,12 @@ async def clear_ledger(request: Request):
     """Wipe all transactions and alerts from the cloud database. Admin only."""
     token = request.headers.get("Authorization")
     db = SessionLocal()
-    requester = db.query(UserProfile).filter(UserProfile.username == token).first()
+    
+    requester = None
+    if token and token in sessions:
+        req_username = sessions[token]
+        requester = db.query(UserProfile).filter(UserProfile.username == req_username).first()
+        
     if not requester or requester.role not in ("admin", "dev"):
         db.close()
         raise HTTPException(status_code=403, detail="Forbidden: Admin or Dev access required")
